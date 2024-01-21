@@ -1,0 +1,39 @@
+﻿@using Photino.Blazor.CustomWindow.Components
+@using System.Drawing;
+
+@inherits LayoutComponentBase
+
+@* Custom window *@
+<CustomWindow WindowColor="#1e88e5" TitleColor="white" Title="Custom Window Demo">
+    <HeaderExtraControlsLayout>
+        <div style="width: @(ProfileClicked ? "125px" : "0"); transition: 0.5s; overflow: hidden">
+            <p style="margin: 0 10px; text-wrap: nowrap; color: white">Profile message!</p>
+        </div>
+        <button class="pb-custom-window-control-button" style="background: transparent"
+                @onclick="() => ProfileClicked = !ProfileClicked">
+            <img src="avatar.png" style="border-radius: 50%; border: 1px solid lightblue" />
+        </button>
+    </HeaderExtraControlsLayout>
+
+    <WindowContent>
+        <div class="app">
+            <div class="sidebar">
+                <NavMenu />
+            </div>
+
+            <div class="main">
+                <div class="top-row px-4">
+                    <a href="http://blazor.net" target="_blank" class="ml-md-auto">About</a>
+                </div>
+
+                <div class="content px-4">
+                    @Body
+                </div>
+            </div>
+        </div>
+    </WindowContent>
+</CustomWindow>
+
+@code {
+    private bool ProfileClicked { get; set; }
+}

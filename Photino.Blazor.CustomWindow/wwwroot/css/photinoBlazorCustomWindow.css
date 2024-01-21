@@ -1,0 +1,80 @@
+.pb-custom-window {
+    background-color: var(--pb-custom-window-color);
+}
+
+    .pb-custom-window > * {
+        position: absolute;
+    }
+
+.pb-custom-window-header {
+    display: grid;
+    grid-template-columns: 1fr auto auto; /* main, extra controls, controls */
+    overflow: hidden;
+    font-size: calc(var(--pb-custom-window-header-height) / 2);
+}
+
+    .pb-custom-window-header > div {
+        height: 100%;
+        overflow: hidden;
+    }
+
+.pb-custom-window-icon {
+}
+
+.pb-custom-window-title {
+    color: var(--pb-custom-window-title-color);
+    font-family: sans-serif;
+    margin: 0;
+    overflow: hidden;
+    text-wrap: nowrap;
+    text-overflow: ellipsis;
+}
+
+.pb-custom-window-control-buttons {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin: 0 3px;
+}
+
+.pb-custom-window-control-button {
+    height: calc(var(--pb-custom-window-header-height) - 6px);
+    aspect-ratio: 1;
+    border-radius: 3px;
+    border: none;
+    padding: 0;
+    transition: 0.1s;
+}
+
+    .pb-custom-window-control-button:hover {
+        background-color: rgba(0,0,0,.5);
+    }
+
+    .pb-custom-window-control-button:focus {
+        outline: none;
+    }
+
+    .pb-custom-window-control-button > svg {
+        fill: white;
+    }
+
+    .pb-custom-window-control-button > img {
+        height: 100%;
+    }
+
+.pb-custom-window-minimize-button {
+    background-color: rgba(0,0,0,.25);
+}
+
+.pb-custom-window-maximize-button {
+    background-color: rgba(0,0,0,.25);
+}
+
+.pb-custom-window-restore-button {
+    background-color: rgba(0,0,0,.25);
+}
+
+.pb-custom-window-close-button {
+    background-color: firebrick;
+}

@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+    <PropertyGroup>
+        <TargetFrameworks>net7.0;net8.0</TargetFrameworks>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <WarningsNotAsErrors>BL0007</WarningsNotAsErrors>
+
+        <Authors>Andersen27</Authors>
+        <Version>1.0.0-alpha</Version>
+        <PackageId>Photino.Blazor.CustomWindow</PackageId>
+        <Title>Photino.Blazor.CustomWindow</Title>
+        <Description>Customizable window view and behaviour implementation for Photino.Blazor applications with Chromeless mode</Description>
+        <PackageDescription>Customizable window view and behaviour implementation for Photino.Blazor applications with Chromeless mode</PackageDescription>
+        <PackageTags>photino;blazor;custom;window;customwindow;customizable;chromeless;header</PackageTags>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+        <RepositoryUrl>https://github.com/tryphotino/photino.Blazor</RepositoryUrl>
+        <PackageIcon>customwindow.png</PackageIcon>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\customwindow.png">
+            <Pack>True</Pack>
+            <PackagePath>\</PackagePath>
+        </None>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Photino.Blazor" Version="2.7.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Content Update="wwwroot\js\photinoBlazorCustomWindow.js">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+</Project>
