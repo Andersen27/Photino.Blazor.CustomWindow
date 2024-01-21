@@ -81,6 +81,6 @@ public static class JSRuntimeExtensions
     public static async ValueTask<Rectangle> GetElementBounds(this IJSRuntime jsRuntime, ElementReference element)
     {
         var bounds = await jsRuntime.InvokeAsync<double[]>("getElementBounds", element);
-        return new Rectangle((int)bounds[0], (int)bounds[1], (int)bounds[2], (int)bounds[3]);
+        return bounds is null ? Rectangle.Empty : new Rectangle((int)bounds[0], (int)bounds[1], (int)bounds[2], (int)bounds[3]);
     }
 }
