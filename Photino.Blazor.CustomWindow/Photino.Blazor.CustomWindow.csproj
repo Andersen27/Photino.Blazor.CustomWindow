@@ -15,24 +15,17 @@
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
         <RepositoryUrl>https://github.com/Andersen27/Photino.Blazor.CustomWindow</RepositoryUrl>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageIcon>customwindow.png</PackageIcon>
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="..\customwindow.png">
-            <Pack>True</Pack>
-            <PackagePath>\</PackagePath>
-        </None>
+        <None Include="..\README.md" Pack="true" PackagePath="\" />
+        <None Include="..\customwindow.png" Pack="true" PackagePath="\" />
     </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="Photino.Blazor" Version="2.7.0" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <Content Update="wwwroot\js\photinoBlazorCustomWindow.js">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </Content>
     </ItemGroup>
 
 </Project>
