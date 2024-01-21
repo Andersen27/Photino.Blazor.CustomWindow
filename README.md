@@ -1,5 +1,5 @@
-# ![customwindow](https://github.com/Andersen27/Photino.Blazor.CustomWindow/blob/master/customwindow.png) Photino.Blazor.CustomWindow
-![preview](https://github.com/Andersen27/Photino.Blazor.CustomWindow/blob/master/preview.png)
+# ![ ](customwindow.png) Photino.Blazor.CustomWindow
+![ ](preview.png)
 
 ## About
 Customizable cross-platform window view and behaviour implementation for Photino.Blazor applications with Chromeless mode.\
@@ -9,8 +9,8 @@ Default control buttons allow to minimize, maximize and close the window. At the
 
 ## How to use
 1. Include **Photino.Blazor.CustomWindow** as PackageReference to your project.
-2. Copy files from [Photino.Blazor.CustomWindow/wwwroot](https://github.com/Andersen27/Photino.Blazor.CustomWindow/tree/master/Photino.Blazor.CustomWindow/wwwroot) folder to your wwwroot.
-3. Use `CustomWindow` component as root in your markup and place your content to its `WindowContent` RenderFragment (see [example](https://github.com/Andersen27/Photino.Blazor.CustomWindow/blob/master/Photino.Blazor.CustomWindow.Sample/Shared/MainLayout.razor)).
+2. Copy files from [Photino.Blazor.CustomWindow/wwwroot](Photino.Blazor.CustomWindow/wwwroot) folder to your wwwroot.
+3. Use `CustomWindow` component as root in your markup and place your content to its `WindowContent` RenderFragment (see [example](Photino.Blazor.CustomWindow.Sample/Shared/MainLayout.razor)).
 4. Don't forget to set the `PhotinoWindow.Chromeless` property to true.
 
 ## Next steps
