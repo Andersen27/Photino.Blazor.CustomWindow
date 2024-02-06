@@ -6,7 +6,7 @@
         <WarningsNotAsErrors>BL0007</WarningsNotAsErrors>
 
         <Authors>Andersen27</Authors>
-        <Version>1.0.1-alpha</Version>
+        <Version>1.0.2-alpha</Version>
         <PackageId>Photino.Blazor.CustomWindow</PackageId>
         <Title>Photino.Blazor.CustomWindow</Title>
         <Description>Customizable window view and behaviour implementation for Photino.Blazor applications with Chromeless mode</Description>

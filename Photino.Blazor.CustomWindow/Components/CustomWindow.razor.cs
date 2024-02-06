@@ -524,18 +524,18 @@ public sealed partial class CustomWindow
         }
     }
 
-    private async Task OnHeaderPointerDownAsync(MouseEventArgs e)
+    private async Task OnHeaderPointerDownAsync(PointerEventArgs e)
     {
         if (e.Button == 0)
         {
             _movingProcess = true;
             _headerPointerOffset = new Point((int)e.OffsetX, (int)e.OffsetY);
-            await JSRuntime.InvokeElementMethodAsync(headerDragArea, "setPointerCapture", 1);
+            await JSRuntime.InvokeElementMethodAsync(headerDragArea, "setPointerCapture", e.PointerId);
             WindowMoveBegin?.Invoke();
         }
     }
 
-    private void OnHeaderPointerUp(MouseEventArgs e)
+    private void OnHeaderPointerUp(PointerEventArgs e)
     {
         if (_movingProcess)
         {
@@ -547,7 +547,7 @@ public sealed partial class CustomWindow
         }
     }
 
-    private void OnHeaderPointerMove(MouseEventArgs e)
+    private void OnHeaderPointerMove(PointerEventArgs e)
     {
         if (_movingProcess)
         {
@@ -581,7 +581,7 @@ public sealed partial class CustomWindow
             Maximized = !Maximized;
     }
 
-    private async Task OnResizeThumbPointerDown(ResizeThumb thumb, MouseEventArgs e)
+    private async Task OnResizeThumbPointerDown(ResizeThumb thumb, PointerEventArgs e)
     {
         if (e.Button == 0)
         {
@@ -599,11 +599,11 @@ public sealed partial class CustomWindow
                 ResizeThumb.BottomRight => resizeThumbBottomRight,
                 _ => default,
             };
-            await JSRuntime.InvokeElementMethodAsync(_activeResizeThumbArea, "setPointerCapture", 1);
+            await JSRuntime.InvokeElementMethodAsync(_activeResizeThumbArea, "setPointerCapture", e.PointerId);
         }
     }
 
-    private void OnResizeThumbPointerUp(MouseEventArgs e)
+    private void OnResizeThumbPointerUp(PointerEventArgs e)
     {
         if (_movingProcess)
         {
@@ -614,7 +614,7 @@ public sealed partial class CustomWindow
         }
     }
 
-    private void OnResizeThumbPointerMove(MouseEventArgs e)
+    private void OnResizeThumbPointerMove(PointerEventArgs e)
     {
         if (_movingProcess)
         {
