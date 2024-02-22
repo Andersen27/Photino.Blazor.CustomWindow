@@ -1,13 +1,13 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
+using Photino.Blazor.CustomWindow.Services;
 using PhotinoNET;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Photino.Blazor.CustomWindow.Components;
@@ -19,7 +19,6 @@ namespace Photino.Blazor.CustomWindow.Components;
 /// </summary>
 public sealed partial class CustomWindow
 {
-    #region Internal types
     private enum ResizeThumb
     {
         Top,
@@ -32,18 +31,7 @@ public sealed partial class CustomWindow
         BottomRight,
     }
 
-    private class ScreenInfo
-    {
-        public Rectangle OriginalArea { get; set; }
-        public double ScaleFactor { get; set; }
-        public int ActualLeft { get; set; }
-        public int ActualTop { get; set; }
-        public bool PositionActualized { get; set; } = false;
-    }
-    #endregion
-
     private static HashSet<PhotinoWindow> _allInitedWindows = new();
-    private static List<ScreenInfo> _screensInfo;
 
     private ElementReference headerDragArea;
     private ElementReference resizeThumbLeft, resizeThumbRight,
@@ -60,6 +48,7 @@ public sealed partial class CustomWindow
     private Point _headerPointerOffset;
     private Point _restoreLocation;
     private Size _restoreSize;
+    private Rectangle? _maximizeWorkArea;
 
     private PhotinoWindow Window => PhotinoBlazorApp.MainWindow;
     private string IconSource => Icon ?? Path.GetFileName(Window.IconFile);
@@ -67,6 +56,9 @@ public sealed partial class CustomWindow
 
     [Inject]
     private PhotinoBlazorApp PhotinoBlazorApp { get; set; }
+
+    [Inject]
+    private ScreensAgentService ScreensAgentService { get; set; }
 
     [Inject]
     private IJSRuntime JSRuntime { get; set; }
@@ -198,7 +190,7 @@ public sealed partial class CustomWindow
             var location = Window.Location;
             if (!location.Equals(value))
             {
-                value = new Point(value.X, Math.Max(0, value.Y));
+                value = new Point(value.X, value.Y);
                 Window.Location = value;
                 LocationChanged.InvokeAsync(value);
             }
@@ -252,9 +244,26 @@ public sealed partial class CustomWindow
                 {
                     _restoreLocation = Location;
                     _restoreSize = Size;
-                    var screenArea = PhotinoBlazorApp.MainWindow.MainMonitor.WorkArea;
-                    Size = screenArea.Size;
-                    Location = screenArea.Location;
+                    
+                    if (!_maximizeWorkArea.HasValue)
+                    {
+                        var maxSquare = 0;
+                        var windowArea = new Rectangle(Location, Size);
+                        foreach(var monitor in Window.Monitors)
+                        {
+                            var intersectArea = monitor.MonitorArea;
+                            intersectArea.Intersect(windowArea);
+                            var square = intersectArea.Width * intersectArea.Height;
+                            if (square > maxSquare)
+                            {
+                                maxSquare = square;
+                                _maximizeWorkArea = monitor.WorkArea;
+                            }
+                        }
+                    }
+
+                    Size = _maximizeWorkArea.Value.Size;
+                    Location = _maximizeWorkArea.Value.Location;
                 }
                 else
                 {
@@ -265,6 +274,7 @@ public sealed partial class CustomWindow
                 ResizeAvailable = !value;
                 _maximized = value;
                 _expanded = value;
+                _maximizeWorkArea = null;
                 MaximizedChanged.InvokeAsync(value);
             }
         }
@@ -410,8 +420,7 @@ public sealed partial class CustomWindow
 
     protected override async Task OnInitializedAsync()
     {
-        if (_screensInfo is null)
-            await UpdateScreensInfo();
+        await ScreensAgentService.Init(JSRuntime);
 
         if (_allInitedWindows.Contains(Window))
             return;
@@ -450,26 +459,15 @@ public sealed partial class CustomWindow
         return cancelClosing;
     }
 
-    private Point GetActualPointerPosition(PointerEventArgs e)
-    {
-        var pointerScreenPos = new Point((int)e.ScreenX, (int)e.ScreenY);
-        var screen = _screensInfo.First(s => s.OriginalArea.Contains(pointerScreenPos));
-        pointerScreenPos.Offset(-screen.OriginalArea.Left, -screen.OriginalArea.Top);
-        return new Point(screen.ActualLeft + (int)(pointerScreenPos.X * screen.ScaleFactor),
-                         screen.ActualTop + (int)(pointerScreenPos.Y * screen.ScaleFactor));
-    }
-
     private Rectangle GetPointerGlobalWorkArea(Point pointerScreenPos)
     {
         var monitor = Window.Monitors.Single(m => m.MonitorArea.Contains(pointerScreenPos));
-        var workArea = monitor.WorkArea;
-        workArea.Offset(monitor.MonitorArea.Location);
-        return workArea;
+        return monitor.WorkArea;
     }
 
     private void UpdateMoveExpand(PointerEventArgs e)
     {
-        var pointerScreenPos = GetActualPointerPosition(e);
+        var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
         var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
 
         if (pointerScreenPos.X < workArea.X + BordersExpandThreshold &&
@@ -520,6 +518,7 @@ public sealed partial class CustomWindow
         }
         else if (pointerScreenPos.Y < workArea.Y + BordersExpandThreshold)
         {
+            _maximizeWorkArea = workArea;
             Maximized = true;
         }
         else if (pointerScreenPos.Y > workArea.Location.Y + workArea.Height - 1 - BordersExpandThreshold)
@@ -536,7 +535,7 @@ public sealed partial class CustomWindow
         if (resizeThumb is ResizeThumb.Left or ResizeThumb.Right)
             return;
 
-        var pointerScreenPos = GetActualPointerPosition(e);
+        var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
         var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
 
         if (pointerScreenPos.Y < workArea.Y + BordersExpandThreshold ||
@@ -554,7 +553,11 @@ public sealed partial class CustomWindow
         if (e.Button == 0)
         {
             _movingProcess = true;
-            _headerPointerOffset = new Point((int)e.OffsetX, (int)e.OffsetY);
+
+            var scale = ScreensAgentService.GetPointerPositionScaleFactor(e);
+            _headerPointerOffset = new Point((int)(e.OffsetX * scale),
+                                             (int)(e.OffsetY * scale));
+
             await JSRuntime.InvokeElementMethodAsync(headerDragArea, "setPointerCapture", e.PointerId);
             WindowMoveBegin?.Invoke();
         }
@@ -569,6 +572,11 @@ public sealed partial class CustomWindow
 
             if (EnableExpand)
                 UpdateMoveExpand(e);
+
+            // hack to force update layout scale when working with different scaled screens
+            var targetSize = Size;
+            Window.Size = new Size(targetSize.Width, targetSize.Height - 1);
+            Window.Size = targetSize;
         }
     }
 
@@ -590,10 +598,10 @@ public sealed partial class CustomWindow
                     Maximized = false; 
             }
 
-            var pointerScreenPos = GetActualPointerPosition(e);
+            var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
             var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
             var limitedPointerPos = new Point(Math.Min(workArea.X + workArea.Width, Math.Max(workArea.X, pointerScreenPos.X)),
-                                              Math.Min(workArea.Y + workArea.Height, Math.Max(workArea.Y, pointerScreenPos.Y)));
+                                              Math.Min(workArea.Y + workArea.Height, Math.Max(workArea.Y + _headerPointerOffset.Y, pointerScreenPos.Y)));
 
             Location = new Point(limitedPointerPos.X - _headerPointerOffset.X, limitedPointerPos.Y - _headerPointerOffset.Y);
             WindowMoving?.Invoke(e);
@@ -643,7 +651,7 @@ public sealed partial class CustomWindow
     {
         if (_movingProcess)
         {
-            var pointerScreenPos = GetActualPointerPosition(e);
+            var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
             var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
             var limitedPointerPos = new Point(Math.Min(workArea.X + workArea.Width, Math.Max(workArea.X, pointerScreenPos.X)),
                                               Math.Min(workArea.Y + workArea.Height, Math.Max(workArea.Y, pointerScreenPos.Y)));
@@ -701,131 +709,6 @@ public sealed partial class CustomWindow
     }
 
     #region Public methods
-    /// <summary>
-    /// Update information about monitors and its areas.
-    /// </summary>
-    public async Task UpdateScreensInfo()
-    {
-        _screensInfo = new();
-
-        var screensInfo = await JSRuntime.InvokeAsync<JsonElement>("getScreensInfo");
-        foreach(var s in screensInfo.EnumerateArray())
-        {
-            _screensInfo.Add(new ScreenInfo()
-            {
-                OriginalArea = new Rectangle(
-                    (int)s[0].GetDouble(), (int)s[1].GetDouble(),
-                    (int)s[2].GetDouble(), (int)s[3].GetDouble()
-                ),
-                ScaleFactor = s[4].GetDouble()
-            });
-        }
-
-        var primaryScreen = _screensInfo.FirstOrDefault(s => s.OriginalArea.Location.IsEmpty);
-        if (primaryScreen is null)
-            throw new Exception("Unable to get correct screens info");
-
-        if (_screensInfo.All(s => s.ScaleFactor == primaryScreen.ScaleFactor))
-        {
-            foreach (var s in _screensInfo)
-            {
-                s.ActualLeft = (int)(s.OriginalArea.Left * primaryScreen.ScaleFactor);
-                s.ActualTop = (int)(s.OriginalArea.Top * primaryScreen.ScaleFactor);
-                s.PositionActualized = true;
-            }
-        }
-        else
-        {
-            var isHorisontalDirection =
-                _screensInfo.Any(s1 => _screensInfo.Any(s2 => s2.OriginalArea.Left == s1.OriginalArea.Width)) ||
-                _screensInfo.Any(s1 => s1.OriginalArea.Left == -s1.OriginalArea.Width);
-            var isVerticalDirection =
-                _screensInfo.Any(s1 => _screensInfo.Any(s2 => s2.OriginalArea.Top == s1.OriginalArea.Height)) ||
-                _screensInfo.Any(s1 => s1.OriginalArea.Top == -s1.OriginalArea.Height);
-
-            if (isHorisontalDirection !^ isVerticalDirection)
-                throw new Exception("Only one-direction monitors positioning supported for different scale factors");
-            else if (isHorisontalDirection)
-            {
-                var commonTopOffset = (int)(primaryScreen.OriginalArea.Height * (primaryScreen.ScaleFactor - 1));
-                void updateActualPosition(LinkedListNode<ScreenInfo> screenNode)
-                {
-                    var screen = screenNode.Value;
-                    if (screen.PositionActualized)
-                        return;
-
-                    if (screen.OriginalArea.Left == 0)
-                    {
-                        screen.ActualLeft = 0;
-                    }
-                    else if (screen.OriginalArea.Left > 0)
-                    {
-                        var screenOnLeft = screenNode.Previous.Value;
-                        if (!screenOnLeft.PositionActualized)
-                            updateActualPosition(screenNode.Previous);
-                        screen.ActualLeft = screenOnLeft.ActualLeft + (int)(screenOnLeft.OriginalArea.Width * screenOnLeft.ScaleFactor);
-                    }
-                    else
-                    {
-                        var screenOnRight = screenNode.Next.Value;
-                        if (!screenOnRight.PositionActualized)
-                            updateActualPosition(screenNode.Next);
-                        screen.ActualLeft = screenOnRight.ActualLeft - (int)(screen.OriginalArea.Width * screen.ScaleFactor);
-                    }
-                    screen.ActualTop = screen.OriginalArea.Top + commonTopOffset;
-                    screen.PositionActualized = true;
-                }
-
-                var linkedScreensInfo = new LinkedList<ScreenInfo>(_screensInfo.OrderBy(s => s.OriginalArea.Left));
-                var currentScreenNode = linkedScreensInfo.First;
-                while(currentScreenNode != null)
-                {
-                    updateActualPosition(currentScreenNode);
-                    currentScreenNode = currentScreenNode.Next;
-                }
-            }
-            else if (isVerticalDirection)
-            {
-                var commonLeftOffset = (int)(primaryScreen.OriginalArea.Width * (primaryScreen.ScaleFactor - 1));
-                void updateActualPosition(LinkedListNode<ScreenInfo> screenNode)
-                {
-                    var screen = screenNode.Value;
-                    if (screen.PositionActualized)
-                        return;
-
-                    if (screen.OriginalArea.Top == 0)
-                    {
-                        screen.ActualTop = 0;
-                    }
-                    else if (screen.OriginalArea.Top > 0)
-                    {
-                        var screenOnTop = screenNode.Previous.Value;
-                        if (!screenOnTop.PositionActualized)
-                            updateActualPosition(screenNode.Previous);
-                        screen.ActualTop = screenOnTop.ActualTop + (int)(screenOnTop.OriginalArea.Height * screenOnTop.ScaleFactor);
-                    }
-                    else
-                    {
-                        var screenOnBottom = screenNode.Next.Value;
-                        if (!screenOnBottom.PositionActualized)
-                            updateActualPosition(screenNode.Next);
-                        screen.ActualTop = screenOnBottom.ActualTop - (int)(screen.OriginalArea.Height * screen.ScaleFactor);
-                    }
-                    screen.ActualLeft = screen.OriginalArea.Left + commonLeftOffset;
-                    screen.PositionActualized = true;
-                }
-
-                var linkedScreensInfo = new LinkedList<ScreenInfo>(_screensInfo.OrderBy(s => s.OriginalArea.Top));
-                var currentScreenNode = linkedScreensInfo.First;
-                while (currentScreenNode != null)
-                {
-                    updateActualPosition(currentScreenNode);
-                    currentScreenNode = currentScreenNode.Next;
-                }
-            }
-        }
-    }
-
     /// <summary>
     /// Minimize window.
     /// </summary>

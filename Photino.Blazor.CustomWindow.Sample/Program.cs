@@ -1,5 +1,6 @@
 ﻿using System;
 using Microsoft.Extensions.DependencyInjection;
+using Photino.Blazor.CustomWindow.Services;
 
 namespace Photino.Blazor.CustomWindow.Sample
 {
@@ -11,6 +12,7 @@ namespace Photino.Blazor.CustomWindow.Sample
             var appBuilder = PhotinoBlazorAppBuilder.CreateDefault(args);
 
             appBuilder.Services
+                .AddSingleton<ScreensAgentService>()
                 .AddLogging();
 
             // register root component and selector
