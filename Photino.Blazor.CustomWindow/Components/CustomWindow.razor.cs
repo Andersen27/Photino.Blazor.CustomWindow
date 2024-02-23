@@ -31,7 +31,9 @@ public sealed partial class CustomWindow
         BottomRight,
     }
 
-    private static HashSet<PhotinoWindow> _allInitedWindows = new();
+    private static readonly HashSet<PhotinoWindow> _allInitedWindows = [];
+
+    private IJSObjectReference _module;
 
     private ElementReference headerDragArea;
     private ElementReference resizeThumbLeft, resizeThumbRight,
@@ -420,7 +422,6 @@ public sealed partial class CustomWindow
 
     protected override async Task OnInitializedAsync()
     {
-        await ScreensAgentService.Init(JSRuntime);
 
         if (_allInitedWindows.Contains(Window))
             return;
@@ -436,6 +437,10 @@ public sealed partial class CustomWindow
         //MinSize = Window.MinSize;
         // can't init MaxSize because PhotinoWindow don't store it's value
         //MaxSize = Window.MaxSize;
+        
+        _module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/Photino.Blazor.CustomWindow/js/pb-custom-window.js");
+        
+        await ScreensAgentService.Init(JSRuntime);
 
         Window.WindowLocationChanged += (_, location) => WindowLocationChanged?.Invoke(location);
         Window.WindowSizeChanged += (_, size) => WindowSizeChanged?.Invoke(size);
@@ -558,7 +563,7 @@ public sealed partial class CustomWindow
             _headerPointerOffset = new Point((int)(e.OffsetX * scale),
                                              (int)(e.OffsetY * scale));
 
-            await JSRuntime.InvokeElementMethodAsync(headerDragArea, "setPointerCapture", e.PointerId);
+            await _module.InvokeElementMethodAsync(headerDragArea, "setPointerCapture", e.PointerId);
             WindowMoveBegin?.Invoke();
         }
     }
@@ -632,7 +637,7 @@ public sealed partial class CustomWindow
                 ResizeThumb.BottomRight => resizeThumbBottomRight,
                 _ => default,
             };
-            await JSRuntime.InvokeElementMethodAsync(_activeResizeThumbArea, "setPointerCapture", e.PointerId);
+            await _module.InvokeElementMethodAsync(_activeResizeThumbArea, "setPointerCapture", e.PointerId);
         }
     }
 

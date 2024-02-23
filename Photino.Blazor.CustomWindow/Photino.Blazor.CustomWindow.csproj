@@ -4,6 +4,7 @@
         <TargetFrameworks>net7.0;net8.0</TargetFrameworks>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <WarningsNotAsErrors>BL0007</WarningsNotAsErrors>
+		<LangVersion>latest</LangVersion>
 
         <Authors>Andersen27</Authors>
         <Version>1.0.2-alpha</Version>
