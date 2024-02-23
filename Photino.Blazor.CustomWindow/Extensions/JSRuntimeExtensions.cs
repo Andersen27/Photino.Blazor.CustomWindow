@@ -53,7 +53,6 @@ public static class JSRuntimeExtensions
     public static async ValueTask InvokeElementMethodAsync(this IJSObjectReference module, ElementReference element, string methodName, params object[] args)
     {
         ArgumentNullException.ThrowIfNull(module);
-
         await module.InvokeVoidAsync("invokeElementMethod", element, methodName, args);
     }
 

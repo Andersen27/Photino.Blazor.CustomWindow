@@ -26,9 +26,9 @@ public sealed partial class CustomWindow
         BottomRight,
     }
 
-    private static readonly HashSet<PhotinoWindow> _allInitedWindows = [];
+    private static readonly HashSet<PhotinoWindow> _initializedWindows = [];
 
-    private IJSObjectReference _module;
+    private IJSObjectReference module;
 
     private ElementReference headerDragArea;
 
@@ -170,7 +170,6 @@ public sealed partial class CustomWindow
     /// <summary>
     /// Window title. By default - <see cref="PhotinoWindow.Title"/>.
     /// </summary>
-    [Parameter]
     public string Title
     {
         get => Window.Title;
@@ -180,7 +179,6 @@ public sealed partial class CustomWindow
     /// <summary>
     /// Window location relative to entire screen top left point.
     /// </summary>
-    [Parameter]
     public Point Location
     {
         get => Window.Location;
@@ -205,7 +203,6 @@ public sealed partial class CustomWindow
     /// <summary>
     /// Window size.
     /// </summary>
-    [Parameter]
     public Size Size
     {
         get => Window.Size;
@@ -231,7 +228,6 @@ public sealed partial class CustomWindow
     /// <summary>
     /// Is window maximized or not. Receives the value of <see cref="PhotinoWindow.Maximized"/> on component initialize.
     /// </summary>
-    [Parameter]
     public bool Maximized
     {
         get => _maximized;
@@ -242,17 +238,6 @@ public sealed partial class CustomWindow
                 if (value)
                 {
                     _restoreLocation = Location;
-
-                    /* Modifica senza merge dal progetto 'Photino.Blazor.CustomWindow (net7.0)'
-                    Prima:
-                                        _restoreSize = Size;
-
-                                        if (!_maximizeWorkArea.HasValue)
-                    Dopo:
-                                        _restoreSize = Size;
-
-                                        if (!_maximizeWorkArea.HasValue)
-                    */
                     _restoreSize = Size;
 
                     if (!_maximizeWorkArea.HasValue)
@@ -299,7 +284,6 @@ public sealed partial class CustomWindow
     /// <summary>
     /// Is window minimized or not.
     /// </summary>
-    [Parameter]
     public bool Minimized
     {
         get => Window.Minimized;
@@ -309,7 +293,6 @@ public sealed partial class CustomWindow
     /// <summary>
     /// Is window topmost or not.
     /// </summary>
-    [Parameter]
     public bool Topmost
     {
         get => Window.Topmost;
@@ -438,7 +421,7 @@ public sealed partial class CustomWindow
 
     protected override async Task OnInitializedAsync()
     {
-        if (_allInitedWindows.Contains(Window))
+        if (_initializedWindows.Contains(Window))
             return;
 
         if (!Window.Chromeless)
@@ -452,19 +435,7 @@ public sealed partial class CustomWindow
         //MinSize = Window.MinSize;
         // can't init MaxSize because PhotinoWindow don't store it's value
 
-        /* Modifica senza merge dal progetto 'Photino.Blazor.CustomWindow (net7.0)'
-        Prima:
-                //MaxSize = Window.MaxSize;
-
-                _module = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/Photino.Blazor.CustomWindow/js/pb-custom-window.js");
-        Dopo:
-                //MaxSize = Window.MaxSize;
-
-                _module = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/Photino.Blazor.CustomWindow/js/pb-custom-window.js");
-        */
-        //MaxSize = Window.MaxSize;
-
-        _module = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/Photino.Blazor.CustomWindow/js/pb-custom-window.js");
+        module = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/Photino.Blazor.CustomWindow/js/pb-custom-window.js");
 
         await ScreensAgent.Initialize(JsRuntime);
 
@@ -475,7 +446,8 @@ public sealed partial class CustomWindow
         Window.WindowClosing += (_, _) => OnWindowClosing();
         Window.WindowFocusIn += (_, _) => { _focused = true; WindowFocusIn?.Invoke(); };
         Window.WindowFocusOut += (_, _) => { _focused = false; WindowFocusOut?.Invoke(); };
-        _allInitedWindows.Add(Window);
+        
+        _initializedWindows.Add(Window);
     }
 
     private bool OnWindowClosing()
@@ -486,7 +458,8 @@ public sealed partial class CustomWindow
 
         var cancelClosing = cancelByCallback || cancelByEvent;
         if (!cancelClosing)
-            _allInitedWindows.Remove(Window);
+            _initializedWindows.Remove(Window);
+
         return cancelClosing;
     }
 
@@ -589,7 +562,7 @@ public sealed partial class CustomWindow
             _headerPointerOffset = new Point((int)(e.OffsetX * scale),
                                              (int)(e.OffsetY * scale));
 
-            await _module.InvokeElementMethodAsync(headerDragArea, "setPointerCapture", e.PointerId);
+            await module.InvokeElementMethodAsync(headerDragArea, "setPointerCapture", e.PointerId);
             WindowMoveBegin?.Invoke();
         }
     }
@@ -663,7 +636,7 @@ public sealed partial class CustomWindow
                 ResizeThumb.BottomRight => resizeThumbBottomRight,
                 _ => default,
             };
-            await _module.InvokeElementMethodAsync(_activeResizeThumbArea, "setPointerCapture", e.PointerId);
+            await module.InvokeElementMethodAsync(_activeResizeThumbArea, "setPointerCapture", e.PointerId);
         }
     }
 
