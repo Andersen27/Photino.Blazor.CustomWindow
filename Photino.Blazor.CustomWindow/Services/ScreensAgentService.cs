@@ -1,37 +1,17 @@
 ﻿using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
-using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace Photino.Blazor.CustomWindow.Services;
 
-public class ScreensAgentService
+public class ScreensAgentService()
 {
-    private const string getScreensInfoScript = @"
-        getScreensInfo();
-        async function getScreensInfo() {
-            var screenDetails = await window.getScreenDetails();
-            return screenDetails.screens.map(s =>
-                [s.left, s.top, s.width, s.height, s.devicePixelRatio]
-            );
-        }";
-
-    private sealed class ScreenInfo
-    {
-        public Rectangle OriginalArea { get; set; }
-        public double ScaleFactor { get; set; }
-        public int ActualLeft { get; set; }
-        public int ActualTop { get; set; }
-        public bool PositionActualized { get; set; } = false;
-    }
+    private IJSObjectReference _module;
 
     private List<ScreenInfo> _screensInfo;
 
-    public bool Inited => _screensInfo != null;
+    public bool Initialized => _screensInfo != null;
 
     public Point GetOSPointerPosition(PointerEventArgs e)
     {
@@ -49,17 +29,20 @@ public class ScreensAgentService
         return screen.ScaleFactor;
     }
 
-    public async Task Init(IJSRuntime jsRuntime)
+    public async Task Initialize(IJSRuntime jsRuntime)
     {
-        if (!Inited)
-            await UpdateScreensInfo(jsRuntime);
+        if (!Initialized)
+        {
+            _module = await jsRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/Photino.Blazor.CustomWindow/js/pb-service-agent.js");
+            await UpdateScreensInfo();
+        }
     }
 
-    public async Task UpdateScreensInfo(IJSRuntime jsRuntime)
+    public async Task UpdateScreensInfo()
     {
-        _screensInfo = new();
+        _screensInfo = [];
 
-        var screensInfo = await jsRuntime.InvokeAsync<JsonElement[]>("eval", getScreensInfoScript);
+        var screensInfo = await _module.InvokeAsync<JsonElement[]>("getScreensInfo");
         foreach (var s in screensInfo)
         {
             _screensInfo.Add(new ScreenInfo()
@@ -72,9 +55,8 @@ public class ScreensAgentService
             });
         }
 
-        var primaryScreen = _screensInfo.FirstOrDefault(s => s.OriginalArea.Location.IsEmpty);
-        if (primaryScreen is null)
-            throw new Exception("Unable to get correct screens info");
+        var primaryScreen = _screensInfo.FirstOrDefault(s => s.OriginalArea.Location.IsEmpty)
+            ?? throw new Exception("Unable to get correct screens info");
 
         primaryScreen.PositionActualized = true;
         if (_screensInfo.Count == 1)
@@ -98,8 +80,11 @@ public class ScreensAgentService
             var isVerticalDirection =
                 _screensInfo.Any(s1 => _screensInfo.Any(s2 => s2 != s1 && s2.OriginalArea.Top >= s1.OriginalArea.Height)) ||
                 _screensInfo.Any(s1 => s1.OriginalArea.Top <= -s1.OriginalArea.Height);
+
             if (!(isHorisontalDirection ^ isVerticalDirection))
+            {
                 throw new Exception("Only one-direction monitors positioning supported for different scale factors");
+            }
             else if (isHorisontalDirection)
             {
                 var commonTopOffset = (int)(primaryScreen.OriginalArea.Height * (primaryScreen.ScaleFactor - 1));
@@ -179,5 +164,14 @@ public class ScreensAgentService
                 }
             }
         }
+    }
+
+    private sealed class ScreenInfo
+    {
+        public int ActualLeft { get; set; }
+        public int ActualTop { get; set; }
+        public Rectangle OriginalArea { get; set; }
+        public bool PositionActualized { get; set; } = false;
+        public double ScaleFactor { get; set; }
     }
 }
