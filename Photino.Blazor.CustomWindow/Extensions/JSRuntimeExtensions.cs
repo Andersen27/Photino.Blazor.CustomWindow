@@ -1,7 +1,22 @@
-﻿using System;
-using System.Drawing;
+﻿/* Modifica senza merge dal progetto 'Photino.Blazor.CustomWindow (net7.0)'
+Prima:
+using System;
+Dopo:
+using Microsoft.AspNetCore.Components;
+using System;
+*/
+
+using Microsoft.AspNetCore.Components;
+
+/* Modifica senza merge dal progetto 'Photino.Blazor.CustomWindow (net7.0)'
+Prima:
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
+Dopo:
+using System.Threading.Tasks;
+*/
+
+using System.Drawing;
 
 namespace Microsoft.JSInterop;
 
@@ -37,10 +52,7 @@ public static class JSRuntimeExtensions
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous invocation operation.</returns>
     public static async ValueTask InvokeElementMethodAsync(this IJSObjectReference module, ElementReference element, string methodName, params object[] args)
     {
-        if (module is null)
-        {
-            throw new ArgumentNullException(nameof(module));
-        }
+        ArgumentNullException.ThrowIfNull(module);
 
         await module.InvokeVoidAsync("invokeElementMethod", element, methodName, args);
     }

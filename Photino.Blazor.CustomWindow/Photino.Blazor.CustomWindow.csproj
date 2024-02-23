@@ -5,6 +5,7 @@
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <WarningsNotAsErrors>BL0007</WarningsNotAsErrors>
 		<LangVersion>latest</LangVersion>
+		<ImplicitUsings>enable</ImplicitUsings>
 
         <Authors>Andersen27</Authors>
         <Version>1.0.2-alpha</Version>

@@ -3,12 +3,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using Photino.Blazor.CustomWindow.Services;
 using PhotinoNET;
-using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Photino.Blazor.CustomWindow.Components;
 
@@ -36,6 +31,7 @@ public sealed partial class CustomWindow
     private IJSObjectReference _module;
 
     private ElementReference headerDragArea;
+
     private ElementReference resizeThumbLeft, resizeThumbRight,
                              resizeThumbTop, resizeThumbBottom,
                              resizeThumbTopLeft, resizeThumbTopRight,
@@ -52,20 +48,21 @@ public sealed partial class CustomWindow
     private Size _restoreSize;
     private Rectangle? _maximizeWorkArea;
 
-    private PhotinoWindow Window => PhotinoBlazorApp.MainWindow;
+    private PhotinoWindow Window => App.MainWindow;
     private string IconSource => Icon ?? Path.GetFileName(Window.IconFile);
     private bool ResizeAvailable { get; set; } = true;
 
     [Inject]
-    private PhotinoBlazorApp PhotinoBlazorApp { get; set; }
+    private PhotinoBlazorApp App { get; set; }
 
     [Inject]
-    private ScreensAgentService ScreensAgentService { get; set; }
+    private ScreensAgentService ScreensAgent { get; set; }
 
     [Inject]
-    private IJSRuntime JSRuntime { get; set; }
+    private IJSRuntime JsRuntime { get; set; }
 
     #region Parameters
+
     [Parameter(CaptureUnmatchedValues = true)]
     public Dictionary<string, object> AdditionalAttributes { get; set; }
 
@@ -245,13 +242,24 @@ public sealed partial class CustomWindow
                 if (value)
                 {
                     _restoreLocation = Location;
+
+                    /* Modifica senza merge dal progetto 'Photino.Blazor.CustomWindow (net7.0)'
+                    Prima:
+                                        _restoreSize = Size;
+
+                                        if (!_maximizeWorkArea.HasValue)
+                    Dopo:
+                                        _restoreSize = Size;
+
+                                        if (!_maximizeWorkArea.HasValue)
+                    */
                     _restoreSize = Size;
-                    
+
                     if (!_maximizeWorkArea.HasValue)
                     {
                         var maxSquare = 0;
                         var windowArea = new Rectangle(Location, Size);
-                        foreach(var monitor in Window.Monitors)
+                        foreach (var monitor in Window.Monitors)
                         {
                             var intersectArea = monitor.MonitorArea;
                             intersectArea.Intersect(windowArea);
@@ -349,9 +357,11 @@ public sealed partial class CustomWindow
     /// </summary>
     [Parameter]
     public WindowClosingHandler WindowClosingCallback { get; set; }
-    #endregion
+
+    #endregion Parameters
 
     #region Public members
+
     /// <summary>
     /// Is window expanded or not.
     /// </summary>
@@ -413,16 +423,21 @@ public sealed partial class CustomWindow
     public event Action WindowFocusOut;
 
     public delegate void WindowLocationChangedHandler(Point location);
+
     public delegate void WindowSizeChangedHandler(Size size);
+
     public delegate void WindowMaximizedHandler(bool maximized);
+
     public delegate void WindowMinimizedHandler();
+
     public delegate bool WindowClosingHandler();
+
     public delegate void WindowMovingHandler(PointerEventArgs e);
-    #endregion
+
+    #endregion Public members
 
     protected override async Task OnInitializedAsync()
     {
-
         if (_allInitedWindows.Contains(Window))
             return;
 
@@ -436,11 +451,22 @@ public sealed partial class CustomWindow
         // can't init MinSize because PhotinoWindow don't store it's value
         //MinSize = Window.MinSize;
         // can't init MaxSize because PhotinoWindow don't store it's value
+
+        /* Modifica senza merge dal progetto 'Photino.Blazor.CustomWindow (net7.0)'
+        Prima:
+                //MaxSize = Window.MaxSize;
+
+                _module = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/Photino.Blazor.CustomWindow/js/pb-custom-window.js");
+        Dopo:
+                //MaxSize = Window.MaxSize;
+
+                _module = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/Photino.Blazor.CustomWindow/js/pb-custom-window.js");
+        */
         //MaxSize = Window.MaxSize;
-        
-        _module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/Photino.Blazor.CustomWindow/js/pb-custom-window.js");
-        
-        await ScreensAgentService.Init(JSRuntime);
+
+        _module = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/Photino.Blazor.CustomWindow/js/pb-custom-window.js");
+
+        await ScreensAgent.Initialize(JsRuntime);
 
         Window.WindowLocationChanged += (_, location) => WindowLocationChanged?.Invoke(location);
         Window.WindowSizeChanged += (_, size) => WindowSizeChanged?.Invoke(size);
@@ -472,7 +498,7 @@ public sealed partial class CustomWindow
 
     private void UpdateMoveExpand(PointerEventArgs e)
     {
-        var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
+        var pointerScreenPos = ScreensAgent.GetOSPointerPosition(e);
         var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
 
         if (pointerScreenPos.X < workArea.X + BordersExpandThreshold &&
@@ -483,7 +509,7 @@ public sealed partial class CustomWindow
             Size = new Size(workArea.Size.Width / 2, workArea.Size.Height / 2);
             Location = workArea.Location;
         }
-        else if (pointerScreenPos.X > workArea.Location.X + workArea.Width - 1 - BordersExpandThreshold  &&
+        else if (pointerScreenPos.X > workArea.Location.X + workArea.Width - 1 - BordersExpandThreshold &&
                  pointerScreenPos.Y < workArea.Y + BordersExpandThreshold)
         {
             _expanded = true;
@@ -540,7 +566,7 @@ public sealed partial class CustomWindow
         if (resizeThumb is ResizeThumb.Left or ResizeThumb.Right)
             return;
 
-        var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
+        var pointerScreenPos = ScreensAgent.GetOSPointerPosition(e);
         var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
 
         if (pointerScreenPos.Y < workArea.Y + BordersExpandThreshold ||
@@ -559,7 +585,7 @@ public sealed partial class CustomWindow
         {
             _movingProcess = true;
 
-            var scale = ScreensAgentService.GetPointerPositionScaleFactor(e);
+            var scale = ScreensAgent.GetPointerPositionScaleFactor(e);
             _headerPointerOffset = new Point((int)(e.OffsetX * scale),
                                              (int)(e.OffsetY * scale));
 
@@ -600,10 +626,10 @@ public sealed partial class CustomWindow
 
                 Size = _restoreSize;
                 if (Maximized)
-                    Maximized = false; 
+                    Maximized = false;
             }
 
-            var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
+            var pointerScreenPos = ScreensAgent.GetOSPointerPosition(e);
             var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
             var limitedPointerPos = new Point(Math.Min(workArea.X + workArea.Width, Math.Max(workArea.X, pointerScreenPos.X)),
                                               Math.Min(workArea.Y + workArea.Height, Math.Max(workArea.Y + _headerPointerOffset.Y, pointerScreenPos.Y)));
@@ -656,7 +682,7 @@ public sealed partial class CustomWindow
     {
         if (_movingProcess)
         {
-            var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
+            var pointerScreenPos = ScreensAgent.GetOSPointerPosition(e);
             var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
             var limitedPointerPos = new Point(Math.Min(workArea.X + workArea.Width, Math.Max(workArea.X, pointerScreenPos.X)),
                                               Math.Min(workArea.Y + workArea.Height, Math.Max(workArea.Y, pointerScreenPos.Y)));
@@ -670,9 +696,11 @@ public sealed partial class CustomWindow
                     Location = new Point(Location.X, Location.Y + deltaTop);
                     Size = new Size(Size.Width, Size.Height - deltaTop);
                     break;
+
                 case ResizeThumb.Bottom:
                     Size = new Size(Size.Width, limitedPointerPos.Y - Location.Y);
                     break;
+
                 case ResizeThumb.Left:
                     var deltaLeft = limitedPointerPos.X - Location.X;
                     deltaLeft = Size.Width - Math.Max(MinSize.Width, Size.Width - deltaLeft);
@@ -680,9 +708,11 @@ public sealed partial class CustomWindow
                     Location = new Point(Location.X + deltaLeft, Location.Y);
                     Size = new Size(Size.Width - deltaLeft, Size.Height);
                     break;
+
                 case ResizeThumb.Right:
                     Size = new Size(limitedPointerPos.X - Location.X, Size.Height);
                     break;
+
                 case ResizeThumb.TopLeft:
                     var deltaTopLeft = new Point(limitedPointerPos.X - Location.X, limitedPointerPos.Y - Location.Y);
                     deltaTopLeft = new Point(Size.Width - Math.Max(MinSize.Width, Size.Width - deltaTopLeft.X),
@@ -692,6 +722,7 @@ public sealed partial class CustomWindow
                     Location = new Point(Location.X + deltaTopLeft.X, Location.Y + deltaTopLeft.Y);
                     Size = new Size(Size.Width - deltaTopLeft.X, Size.Height - deltaTopLeft.Y);
                     break;
+
                 case ResizeThumb.TopRight:
                     var deltaTopRight = limitedPointerPos.Y - Location.Y;
                     deltaTopRight = Size.Height - Math.Max(MinSize.Height, Size.Height - deltaTopRight);
@@ -699,13 +730,15 @@ public sealed partial class CustomWindow
                     Location = new Point(Location.X, Location.Y + deltaTopRight);
                     Size = new Size(limitedPointerPos.X - Location.X, Size.Height - deltaTopRight);
                     break;
+
                 case ResizeThumb.BottomLeft:
                     var deltaBottomLeft = limitedPointerPos.X - Location.X;
                     deltaBottomLeft = Size.Width - Math.Max(MinSize.Width, Size.Width - deltaBottomLeft);
                     deltaBottomLeft = Size.Width - Math.Min(MaxSize.Width, Size.Width - deltaBottomLeft);
-                    Location = new Point(Location.X + deltaBottomLeft, Location.Y);;
+                    Location = new Point(Location.X + deltaBottomLeft, Location.Y); ;
                     Size = new Size(Size.Width - deltaBottomLeft, limitedPointerPos.Y - Location.Y);
                     break;
+
                 case ResizeThumb.BottomRight:
                     Size = new Size(limitedPointerPos.X - Location.X, limitedPointerPos.Y - Location.Y);
                     break;
@@ -714,6 +747,7 @@ public sealed partial class CustomWindow
     }
 
     #region Public methods
+
     /// <summary>
     /// Minimize window.
     /// </summary>
@@ -743,5 +777,6 @@ public sealed partial class CustomWindow
         Window.Topmost = true;
         Window.Topmost = false;
     }
-    #endregion
+
+    #endregion Public methods
 }
