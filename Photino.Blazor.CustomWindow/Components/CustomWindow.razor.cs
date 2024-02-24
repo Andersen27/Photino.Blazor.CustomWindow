@@ -14,6 +14,37 @@ namespace Photino.Blazor.CustomWindow.Components;
 /// </summary>
 public sealed partial class CustomWindow
 {
+    private static readonly HashSet<PhotinoWindow> _initializedWindows = [];
+
+    private ResizeThumb _activeResizeThumb;
+
+    private ElementReference _activeResizeThumbArea;
+
+    private bool _expanded;
+
+    private bool _focused;
+
+    private Point _headerPointerOffset;
+
+    private bool _maximized;
+
+    private Rectangle? _maximizeWorkArea;
+
+    private bool _movingProcess;
+
+    private Point _restoreLocation;
+
+    private Size _restoreSize;
+
+    private ElementReference headerDragArea;
+
+    private IJSObjectReference module;
+
+    private ElementReference resizeThumbLeft, resizeThumbRight,
+                             resizeThumbTop, resizeThumbBottom,
+                             resizeThumbTopLeft, resizeThumbTopRight,
+                             resizeThumbBottomLeft, resizeThumbBottomRight;
+
     private enum ResizeThumb
     {
         Top,
@@ -26,40 +57,20 @@ public sealed partial class CustomWindow
         BottomRight,
     }
 
-    private static readonly HashSet<PhotinoWindow> _initializedWindows = [];
-
-    private IJSObjectReference module;
-
-    private ElementReference headerDragArea;
-
-    private ElementReference resizeThumbLeft, resizeThumbRight,
-                             resizeThumbTop, resizeThumbBottom,
-                             resizeThumbTopLeft, resizeThumbTopRight,
-                             resizeThumbBottomLeft, resizeThumbBottomRight;
-
-    private ElementReference _activeResizeThumbArea;
-    private ResizeThumb _activeResizeThumb;
-    private bool _movingProcess;
-    private bool _maximized;
-    private bool _expanded;
-    private bool _focused;
-    private Point _headerPointerOffset;
-    private Point _restoreLocation;
-    private Size _restoreSize;
-    private Rectangle? _maximizeWorkArea;
-
-    private PhotinoWindow Window => App.MainWindow;
-    private string IconSource => Icon ?? Path.GetFileName(Window.IconFile);
-    private bool ResizeAvailable { get; set; } = true;
-
     [Inject]
     private PhotinoBlazorApp App { get; set; }
+
+    private string IconSource => Icon ?? Path.GetFileName(Window.IconFile);
+
+    [Inject]
+    private IJSRuntime JsRuntime { get; set; }
+
+    private bool ResizeAvailable { get; set; } = true;
 
     [Inject]
     private ScreensAgentService ScreensAgent { get; set; }
 
-    [Inject]
-    private IJSRuntime JsRuntime { get; set; }
+    private PhotinoWindow Window => App.MainWindow;
 
     #region Parameters
 
@@ -67,22 +78,22 @@ public sealed partial class CustomWindow
     public Dictionary<string, object> AdditionalAttributes { get; set; }
 
     /// <summary>
-    /// Inline CSS-style for root element.
+    /// Threshold for expand window when moving it towards the bounds of the monitor work area.
     /// </summary>
     [Parameter]
-    public string Style { get; set; }
+    public uint BordersExpandThreshold { get; set; } = 8;
 
     /// <summary>
-    /// Razor layout inside window.
+    /// Razor layout for default close button instead of default svg
     /// </summary>
     [Parameter]
-    public RenderFragment WindowContent { get; set; }
+    public RenderFragment CloseButtonContent { get; set; } = null;
 
     /// <summary>
-    /// Razor layout for left side of window header. By default - window icon and title.
+    /// Is window expand when moving it towards the bounds of the monitor work area enabled or not.
     /// </summary>
     [Parameter]
-    public RenderFragment HeaderMainLayout { get; set; } = null;
+    public bool EnableExpand { get; set; } = true;
 
     /// <summary>
     /// Razor layout for central part of window header. By default - empty.
@@ -107,28 +118,16 @@ public sealed partial class CustomWindow
     public RenderFragment HeaderExtraControlsLayout { get; set; } = null;
 
     /// <summary>
-    /// Razor layout for default minimize button instead of default svg
+    /// Custom header height in screen pixels.
     /// </summary>
     [Parameter]
-    public RenderFragment MinimizeButtonContent { get; set; } = null;
+    public uint HeaderHeight { get; set; } = 28;
 
     /// <summary>
-    /// Razor layout for default maximize button instead of default svg
+    /// Razor layout for left side of window header. By default - window icon and title.
     /// </summary>
     [Parameter]
-    public RenderFragment MaximizeButtonContent { get; set; } = null;
-
-    /// <summary>
-    /// Razor layout for default restore button instead of default svg
-    /// </summary>
-    [Parameter]
-    public RenderFragment RestoreButtonContent { get; set; } = null;
-
-    /// <summary>
-    /// Razor layout for default close button instead of default svg
-    /// </summary>
-    [Parameter]
-    public RenderFragment CloseButtonContent { get; set; } = null;
+    public RenderFragment HeaderMainLayout { get; set; } = null;
 
     /// <summary>
     /// Path for icon image source relative to wwwroot folder.
@@ -138,47 +137,9 @@ public sealed partial class CustomWindow
     public string Icon { get; set; } = null;
 
     /// <summary>
-    /// CSS-based color of custom window. This includes header background and borders color.
-    /// </summary>
-    [Parameter]
-    public string WindowColor { get; set; } = "white";
-
-    /// <summary>
-    /// CSS-based color of header title text.
-    /// </summary>
-    [Parameter]
-    public string TitleColor { get; set; } = "black";
-
-    /// <summary>
-    /// Minimum allowable window size.
-    /// </summary>
-    [Parameter]
-    public Size MinSize { get; set; } = new Size(150, 150);
-
-    /// <summary>
-    /// Maximum allowable window size.
-    /// </summary>
-    [Parameter]
-    public Size MaxSize { get; set; } = new Size(int.MaxValue, int.MaxValue);
-
-    /// <summary>
-    /// Is window resizable by borders or not.
-    /// </summary>
-    [Parameter]
-    public bool Resizable { get; set; } = true;
-
-    /// <summary>
-    /// Window title. By default - <see cref="PhotinoWindow.Title"/>.
-    /// </summary>
-    public string Title
-    {
-        get => Window.Title;
-        set => Window.Title = value;
-    }
-
-    /// <summary>
     /// Window location relative to entire screen top left point.
     /// </summary>
+    [Parameter]
     public Point Location
     {
         get => Window.Location;
@@ -201,33 +162,15 @@ public sealed partial class CustomWindow
     public EventCallback<Point> LocationChanged { get; set; }
 
     /// <summary>
-    /// Window size.
-    /// </summary>
-    public Size Size
-    {
-        get => Window.Size;
-        set
-        {
-            var size = Window.Size;
-            value = new Size(Math.Min(MaxSize.Width, Math.Max(MinSize.Width, value.Width)),
-                             Math.Min(MaxSize.Height, Math.Max(MinSize.Height, value.Height)));
-            if (!size.Equals(value))
-            {
-                Window.Size = value;
-                SizeChanged.InvokeAsync(value);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Window size changed event callback. Passes the new size value.
+    /// Razor layout for default maximize button instead of default svg
     /// </summary>
     [Parameter]
-    public EventCallback<Size> SizeChanged { get; set; }
+    public RenderFragment MaximizeButtonContent { get; set; } = null;
 
     /// <summary>
     /// Is window maximized or not. Receives the value of <see cref="PhotinoWindow.Maximized"/> on component initialize.
     /// </summary>
+    [Parameter]
     public bool Maximized
     {
         get => _maximized;
@@ -282,8 +225,27 @@ public sealed partial class CustomWindow
     public EventCallback<bool> MaximizedChanged { get; set; }
 
     /// <summary>
+    /// Maximize/restore window on header double click or not.
+    /// </summary>
+    [Parameter]
+    public bool MaximizeOnHeaderDoubleClick { get; set; } = true;
+
+    /// <summary>
+    /// Maximum allowable window size.
+    /// </summary>
+    [Parameter]
+    public Size MaxSize { get; set; } = new Size(int.MaxValue, int.MaxValue);
+
+    /// <summary>
+    /// Razor layout for default minimize button instead of default svg
+    /// </summary>
+    [Parameter]
+    public RenderFragment MinimizeButtonContent { get; set; } = null;
+
+    /// <summary>
     /// Is window minimized or not.
     /// </summary>
+    [Parameter]
     public bool Minimized
     {
         get => Window.Minimized;
@@ -291,19 +253,16 @@ public sealed partial class CustomWindow
     }
 
     /// <summary>
-    /// Is window topmost or not.
-    /// </summary>
-    public bool Topmost
-    {
-        get => Window.Topmost;
-        set => Window.Topmost = value;
-    }
-
-    /// <summary>
-    /// Custom header height in screen pixels.
+    /// Minimum allowable window size.
     /// </summary>
     [Parameter]
-    public uint HeaderHeight { get; set; } = 28;
+    public Size MinSize { get; set; } = new Size(150, 150);
+
+    /// <summary>
+    /// Is window resizable by borders or not.
+    /// </summary>
+    [Parameter]
+    public bool Resizable { get; set; } = true;
 
     /// <summary>
     /// Invisible resize area width along window borders in screen pixels.
@@ -312,10 +271,10 @@ public sealed partial class CustomWindow
     public uint ResizeAreaWidth { get; set; } = 6;
 
     /// <summary>
-    /// Threshold for expand window when moving it towards the bounds of the monitor work area.
+    /// Razor layout for default restore button instead of default svg
     /// </summary>
     [Parameter]
-    public uint BordersExpandThreshold { get; set; } = 8;
+    public RenderFragment RestoreButtonContent { get; set; } = null;
 
     /// <summary>
     /// Is icon from default <see cref="HeaderMainLayout"/> should be displayed or not.
@@ -324,16 +283,62 @@ public sealed partial class CustomWindow
     public bool ShowIcon { get; set; } = true;
 
     /// <summary>
-    /// Is window expand when moving it towards the bounds of the monitor work area enabled or not.
+    /// Window size.
     /// </summary>
     [Parameter]
-    public bool EnableExpand { get; set; } = true;
+    public Size Size
+    {
+        get => Window.Size;
+        set
+        {
+            var size = Window.Size;
+            value = new Size(Math.Min(MaxSize.Width, Math.Max(MinSize.Width, value.Width)),
+                             Math.Min(MaxSize.Height, Math.Max(MinSize.Height, value.Height)));
+            if (!size.Equals(value))
+            {
+                Window.Size = value;
+                SizeChanged.InvokeAsync(value);
+            }
+        }
+    }
 
     /// <summary>
-    /// Maximize/restore window on header double click or not.
+    /// Window size changed event callback. Passes the new size value.
     /// </summary>
     [Parameter]
-    public bool MaximizeOnHeaderDoubleClick { get; set; } = true;
+    public EventCallback<Size> SizeChanged { get; set; }
+
+    /// <summary>
+    /// Inline CSS-style for root element.
+    /// </summary>
+    [Parameter]
+    public string Style { get; set; }
+
+    /// <summary>
+    /// Window title. By default - <see cref="PhotinoWindow.Title"/>.
+    /// </summary>
+    [Parameter]
+    public string Title
+    {
+        get => Window.Title;
+        set => Window.Title = value;
+    }
+
+    /// <summary>
+    /// CSS-based color of header title text.
+    /// </summary>
+    [Parameter]
+    public string TitleColor { get; set; } = "black";
+
+    /// <summary>
+    /// Is window topmost or not.
+    /// </summary>
+    [Parameter]
+    public bool Topmost
+    {
+        get => Window.Topmost;
+        set => Window.Topmost = value;
+    }
 
     /// <summary>
     /// Window closing event callback. Should return <c>bool</c> value, that means does window closing canceled or not.
@@ -341,29 +346,53 @@ public sealed partial class CustomWindow
     [Parameter]
     public WindowClosingHandler WindowClosingCallback { get; set; }
 
+    /// <summary>
+    /// CSS-based color of custom window. This includes header background and borders color.
+    /// </summary>
+    [Parameter]
+    public string WindowColor { get; set; } = "white";
+
+    /// <summary>
+    /// Razor layout inside window.
+    /// </summary>
+    [Parameter]
+    public RenderFragment WindowContent { get; set; }
+
     #endregion Parameters
 
     #region Public members
 
-    /// <summary>
-    /// Is window expanded or not.
-    /// </summary>
-    public bool Expanded => _expanded;
+    public delegate bool WindowClosingHandler();
+
+    public delegate void WindowLocationChangedHandler(Point location);
+
+    public delegate void WindowMaximizedHandler(bool maximized);
+
+    public delegate void WindowMinimizedHandler();
+
+    public delegate void WindowMovingHandler(PointerEventArgs e);
+
+    public delegate void WindowSizeChangedHandler(Size size);
 
     /// <summary>
-    /// Is window focused or not.
+    /// Window closing event. Should return <c>bool</c> value, that means does window closing canceled or not.
     /// </summary>
-    public bool Focused => _focused;
+    public event WindowClosingHandler WindowClosing;
+
+    /// <summary>
+    /// Window focus receive event.
+    /// </summary>
+    public event Action WindowFocusIn;
+
+    /// <summary>
+    /// Window focus lost event.
+    /// </summary>
+    public event Action WindowFocusOut;
 
     /// <summary>
     /// Window location changed event. Passes the new location value.
     /// </summary>
     public event WindowLocationChangedHandler WindowLocationChanged;
-
-    /// <summary>
-    /// Window size changed event. Passes the new size value.
-    /// </summary>
-    public event WindowSizeChangedHandler WindowSizeChanged;
 
     /// <summary>
     /// Window maximized changed event. Passes the new maximized value.
@@ -376,16 +405,6 @@ public sealed partial class CustomWindow
     public event WindowMinimizedHandler WindowMinimized;
 
     /// <summary>
-    /// Window closing event. Should return <c>bool</c> value, that means does window closing canceled or not.
-    /// </summary>
-    public event WindowClosingHandler WindowClosing;
-
-    /// <summary>
-    /// Window moving event. Passes <see cref="PointerEventArgs"/> of header moving process.
-    /// </summary>
-    public event WindowMovingHandler WindowMoving;
-
-    /// <summary>
     /// Window move begin event.
     /// </summary>
     public event Action WindowMoveBegin;
@@ -396,26 +415,24 @@ public sealed partial class CustomWindow
     public event Action WindowMoveEnd;
 
     /// <summary>
-    /// Window focus receive event.
+    /// Window moving event. Passes <see cref="PointerEventArgs"/> of header moving process.
     /// </summary>
-    public event Action WindowFocusIn;
+    public event WindowMovingHandler WindowMoving;
 
     /// <summary>
-    /// Window focus lost event.
+    /// Window size changed event. Passes the new size value.
     /// </summary>
-    public event Action WindowFocusOut;
+    public event WindowSizeChangedHandler WindowSizeChanged;
 
-    public delegate void WindowLocationChangedHandler(Point location);
+    /// <summary>
+    /// Is window expanded or not.
+    /// </summary>
+    public bool Expanded => _expanded;
 
-    public delegate void WindowSizeChangedHandler(Size size);
-
-    public delegate void WindowMaximizedHandler(bool maximized);
-
-    public delegate void WindowMinimizedHandler();
-
-    public delegate bool WindowClosingHandler();
-
-    public delegate void WindowMovingHandler(PointerEventArgs e);
+    /// <summary>
+    /// Is window focused or not.
+    /// </summary>
+    public bool Focused => _focused;
 
     #endregion Public members
 
@@ -446,8 +463,181 @@ public sealed partial class CustomWindow
         Window.WindowClosing += (_, _) => OnWindowClosing();
         Window.WindowFocusIn += (_, _) => { _focused = true; WindowFocusIn?.Invoke(); };
         Window.WindowFocusOut += (_, _) => { _focused = false; WindowFocusOut?.Invoke(); };
-        
+
         _initializedWindows.Add(Window);
+    }
+
+    private Rectangle GetPointerGlobalWorkArea(Point pointerScreenPos)
+    {
+        var monitor = Window.Monitors.Single(m => m.MonitorArea.Contains(pointerScreenPos));
+        return monitor.WorkArea;
+    }
+
+    private void OnHeaderDoubleClick()
+    {
+        if (MaximizeOnHeaderDoubleClick)
+            Maximized = !Maximized;
+    }
+
+    private async Task OnHeaderPointerDownAsync(PointerEventArgs e)
+    {
+        if (e.Button == 0)
+        {
+            _movingProcess = true;
+
+            var scale = ScreensAgent.GetPointerPositionScaleFactor(e);
+            _headerPointerOffset = new Point((int)(e.OffsetX * scale),
+                                             (int)(e.OffsetY * scale));
+
+            await module.InvokeElementMethodAsync(headerDragArea, "setPointerCapture", e.PointerId);
+            WindowMoveBegin?.Invoke();
+        }
+    }
+
+    private void OnHeaderPointerMove(PointerEventArgs e)
+    {
+        if (_movingProcess)
+        {
+            if (_expanded)
+            {
+                var newPointerOffsetX = Size.Width - _headerPointerOffset.X < _restoreSize.Width ?
+                    _headerPointerOffset.X - (Size.Width - _restoreSize.Width) :
+                    _restoreSize.Width / 2;
+                _restoreLocation = new Point(_headerPointerOffset.X - newPointerOffsetX, 0);
+                _headerPointerOffset = new Point(newPointerOffsetX, _headerPointerOffset.Y);
+                _expanded = false;
+
+                Size = _restoreSize;
+                if (Maximized)
+                    Maximized = false;
+            }
+
+            var pointerScreenPos = ScreensAgent.GetOSPointerPosition(e);
+            var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
+            var limitedPointerPos = new Point(Math.Min(workArea.X + workArea.Width, Math.Max(workArea.X, pointerScreenPos.X)),
+                                              Math.Min(workArea.Y + workArea.Height, Math.Max(workArea.Y + _headerPointerOffset.Y, pointerScreenPos.Y)));
+
+            Location = new Point(limitedPointerPos.X - _headerPointerOffset.X, limitedPointerPos.Y - _headerPointerOffset.Y);
+            WindowMoving?.Invoke(e);
+        }
+    }
+
+    private void OnHeaderPointerUp(PointerEventArgs e)
+    {
+        if (_movingProcess)
+        {
+            _movingProcess = false;
+            WindowMoveEnd?.Invoke();
+
+            if (EnableExpand)
+                UpdateMoveExpand(e);
+
+            // hack to force update layout scale when working with different scaled screens
+            var targetSize = Size;
+            Window.Size = new Size(targetSize.Width, targetSize.Height - 1);
+            Window.Size = targetSize;
+        }
+    }
+
+    private async Task OnResizeThumbPointerDown(ResizeThumb thumb, PointerEventArgs e)
+    {
+        if (e.Button == 0)
+        {
+            _movingProcess = true;
+            _activeResizeThumb = thumb;
+            _activeResizeThumbArea = _activeResizeThumb switch
+            {
+                ResizeThumb.Top => resizeThumbTop,
+                ResizeThumb.Bottom => resizeThumbBottom,
+                ResizeThumb.Left => resizeThumbLeft,
+                ResizeThumb.Right => resizeThumbRight,
+                ResizeThumb.TopLeft => resizeThumbTopLeft,
+                ResizeThumb.TopRight => resizeThumbTopRight,
+                ResizeThumb.BottomLeft => resizeThumbBottomLeft,
+                ResizeThumb.BottomRight => resizeThumbBottomRight,
+                _ => default,
+            };
+            await module.InvokeElementMethodAsync(_activeResizeThumbArea, "setPointerCapture", e.PointerId);
+        }
+    }
+
+    private void OnResizeThumbPointerMove(PointerEventArgs e)
+    {
+        if (_movingProcess)
+        {
+            var pointerScreenPos = ScreensAgent.GetOSPointerPosition(e);
+            var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
+            var limitedPointerPos = new Point(Math.Min(workArea.X + workArea.Width, Math.Max(workArea.X, pointerScreenPos.X)),
+                                              Math.Min(workArea.Y + workArea.Height, Math.Max(workArea.Y, pointerScreenPos.Y)));
+
+            switch (_activeResizeThumb)
+            {
+                case ResizeThumb.Top:
+                    var deltaTop = limitedPointerPos.Y - Location.Y;
+                    deltaTop = Size.Height - Math.Max(MinSize.Height, Size.Height - deltaTop);
+                    deltaTop = Size.Height - Math.Min(MaxSize.Height, Size.Height - deltaTop);
+                    Location = new Point(Location.X, Location.Y + deltaTop);
+                    Size = new Size(Size.Width, Size.Height - deltaTop);
+                    break;
+
+                case ResizeThumb.Bottom:
+                    Size = new Size(Size.Width, limitedPointerPos.Y - Location.Y);
+                    break;
+
+                case ResizeThumb.Left:
+                    var deltaLeft = limitedPointerPos.X - Location.X;
+                    deltaLeft = Size.Width - Math.Max(MinSize.Width, Size.Width - deltaLeft);
+                    deltaLeft = Size.Width - Math.Min(MaxSize.Width, Size.Width - deltaLeft);
+                    Location = new Point(Location.X + deltaLeft, Location.Y);
+                    Size = new Size(Size.Width - deltaLeft, Size.Height);
+                    break;
+
+                case ResizeThumb.Right:
+                    Size = new Size(limitedPointerPos.X - Location.X, Size.Height);
+                    break;
+
+                case ResizeThumb.TopLeft:
+                    var deltaTopLeft = new Point(limitedPointerPos.X - Location.X, limitedPointerPos.Y - Location.Y);
+                    deltaTopLeft = new Point(Size.Width - Math.Max(MinSize.Width, Size.Width - deltaTopLeft.X),
+                                             Size.Height - Math.Max(MinSize.Height, Size.Height - deltaTopLeft.Y));
+                    deltaTopLeft = new Point(Size.Width - Math.Min(MaxSize.Width, Size.Width - deltaTopLeft.X),
+                                             Size.Height - Math.Min(MaxSize.Height, Size.Height - deltaTopLeft.Y));
+                    Location = new Point(Location.X + deltaTopLeft.X, Location.Y + deltaTopLeft.Y);
+                    Size = new Size(Size.Width - deltaTopLeft.X, Size.Height - deltaTopLeft.Y);
+                    break;
+
+                case ResizeThumb.TopRight:
+                    var deltaTopRight = limitedPointerPos.Y - Location.Y;
+                    deltaTopRight = Size.Height - Math.Max(MinSize.Height, Size.Height - deltaTopRight);
+                    deltaTopRight = Size.Height - Math.Min(MaxSize.Height, Size.Height - deltaTopRight);
+                    Location = new Point(Location.X, Location.Y + deltaTopRight);
+                    Size = new Size(limitedPointerPos.X - Location.X, Size.Height - deltaTopRight);
+                    break;
+
+                case ResizeThumb.BottomLeft:
+                    var deltaBottomLeft = limitedPointerPos.X - Location.X;
+                    deltaBottomLeft = Size.Width - Math.Max(MinSize.Width, Size.Width - deltaBottomLeft);
+                    deltaBottomLeft = Size.Width - Math.Min(MaxSize.Width, Size.Width - deltaBottomLeft);
+                    Location = new Point(Location.X + deltaBottomLeft, Location.Y); ;
+                    Size = new Size(Size.Width - deltaBottomLeft, limitedPointerPos.Y - Location.Y);
+                    break;
+
+                case ResizeThumb.BottomRight:
+                    Size = new Size(limitedPointerPos.X - Location.X, limitedPointerPos.Y - Location.Y);
+                    break;
+            }
+        }
+    }
+
+    private void OnResizeThumbPointerUp(PointerEventArgs e)
+    {
+        if (_movingProcess)
+        {
+            _movingProcess = false;
+
+            if (EnableExpand)
+                UpdateResizeExpand(_activeResizeThumb, e);
+        }
     }
 
     private bool OnWindowClosing()
@@ -461,12 +651,6 @@ public sealed partial class CustomWindow
             _initializedWindows.Remove(Window);
 
         return cancelClosing;
-    }
-
-    private Rectangle GetPointerGlobalWorkArea(Point pointerScreenPos)
-    {
-        var monitor = Window.Monitors.Single(m => m.MonitorArea.Contains(pointerScreenPos));
-        return monitor.WorkArea;
     }
 
     private void UpdateMoveExpand(PointerEventArgs e)
@@ -552,189 +736,7 @@ public sealed partial class CustomWindow
         }
     }
 
-    private async Task OnHeaderPointerDownAsync(PointerEventArgs e)
-    {
-        if (e.Button == 0)
-        {
-            _movingProcess = true;
-
-            var scale = ScreensAgent.GetPointerPositionScaleFactor(e);
-            _headerPointerOffset = new Point((int)(e.OffsetX * scale),
-                                             (int)(e.OffsetY * scale));
-
-            await module.InvokeElementMethodAsync(headerDragArea, "setPointerCapture", e.PointerId);
-            WindowMoveBegin?.Invoke();
-        }
-    }
-
-    private void OnHeaderPointerUp(PointerEventArgs e)
-    {
-        if (_movingProcess)
-        {
-            _movingProcess = false;
-            WindowMoveEnd?.Invoke();
-
-            if (EnableExpand)
-                UpdateMoveExpand(e);
-
-            // hack to force update layout scale when working with different scaled screens
-            var targetSize = Size;
-            Window.Size = new Size(targetSize.Width, targetSize.Height - 1);
-            Window.Size = targetSize;
-        }
-    }
-
-    private void OnHeaderPointerMove(PointerEventArgs e)
-    {
-        if (_movingProcess)
-        {
-            if (_expanded)
-            {
-                var newPointerOffsetX = Size.Width - _headerPointerOffset.X < _restoreSize.Width ?
-                    _headerPointerOffset.X - (Size.Width - _restoreSize.Width) :
-                    _restoreSize.Width / 2;
-                _restoreLocation = new Point(_headerPointerOffset.X - newPointerOffsetX, 0);
-                _headerPointerOffset = new Point(newPointerOffsetX, _headerPointerOffset.Y);
-                _expanded = false;
-
-                Size = _restoreSize;
-                if (Maximized)
-                    Maximized = false;
-            }
-
-            var pointerScreenPos = ScreensAgent.GetOSPointerPosition(e);
-            var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
-            var limitedPointerPos = new Point(Math.Min(workArea.X + workArea.Width, Math.Max(workArea.X, pointerScreenPos.X)),
-                                              Math.Min(workArea.Y + workArea.Height, Math.Max(workArea.Y + _headerPointerOffset.Y, pointerScreenPos.Y)));
-
-            Location = new Point(limitedPointerPos.X - _headerPointerOffset.X, limitedPointerPos.Y - _headerPointerOffset.Y);
-            WindowMoving?.Invoke(e);
-        }
-    }
-
-    private void OnHeaderDoubleClick()
-    {
-        if (MaximizeOnHeaderDoubleClick)
-            Maximized = !Maximized;
-    }
-
-    private async Task OnResizeThumbPointerDown(ResizeThumb thumb, PointerEventArgs e)
-    {
-        if (e.Button == 0)
-        {
-            _movingProcess = true;
-            _activeResizeThumb = thumb;
-            _activeResizeThumbArea = _activeResizeThumb switch
-            {
-                ResizeThumb.Top => resizeThumbTop,
-                ResizeThumb.Bottom => resizeThumbBottom,
-                ResizeThumb.Left => resizeThumbLeft,
-                ResizeThumb.Right => resizeThumbRight,
-                ResizeThumb.TopLeft => resizeThumbTopLeft,
-                ResizeThumb.TopRight => resizeThumbTopRight,
-                ResizeThumb.BottomLeft => resizeThumbBottomLeft,
-                ResizeThumb.BottomRight => resizeThumbBottomRight,
-                _ => default,
-            };
-            await module.InvokeElementMethodAsync(_activeResizeThumbArea, "setPointerCapture", e.PointerId);
-        }
-    }
-
-    private void OnResizeThumbPointerUp(PointerEventArgs e)
-    {
-        if (_movingProcess)
-        {
-            _movingProcess = false;
-
-            if (EnableExpand)
-                UpdateResizeExpand(_activeResizeThumb, e);
-        }
-    }
-
-    private void OnResizeThumbPointerMove(PointerEventArgs e)
-    {
-        if (_movingProcess)
-        {
-            var pointerScreenPos = ScreensAgent.GetOSPointerPosition(e);
-            var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
-            var limitedPointerPos = new Point(Math.Min(workArea.X + workArea.Width, Math.Max(workArea.X, pointerScreenPos.X)),
-                                              Math.Min(workArea.Y + workArea.Height, Math.Max(workArea.Y, pointerScreenPos.Y)));
-
-            switch (_activeResizeThumb)
-            {
-                case ResizeThumb.Top:
-                    var deltaTop = limitedPointerPos.Y - Location.Y;
-                    deltaTop = Size.Height - Math.Max(MinSize.Height, Size.Height - deltaTop);
-                    deltaTop = Size.Height - Math.Min(MaxSize.Height, Size.Height - deltaTop);
-                    Location = new Point(Location.X, Location.Y + deltaTop);
-                    Size = new Size(Size.Width, Size.Height - deltaTop);
-                    break;
-
-                case ResizeThumb.Bottom:
-                    Size = new Size(Size.Width, limitedPointerPos.Y - Location.Y);
-                    break;
-
-                case ResizeThumb.Left:
-                    var deltaLeft = limitedPointerPos.X - Location.X;
-                    deltaLeft = Size.Width - Math.Max(MinSize.Width, Size.Width - deltaLeft);
-                    deltaLeft = Size.Width - Math.Min(MaxSize.Width, Size.Width - deltaLeft);
-                    Location = new Point(Location.X + deltaLeft, Location.Y);
-                    Size = new Size(Size.Width - deltaLeft, Size.Height);
-                    break;
-
-                case ResizeThumb.Right:
-                    Size = new Size(limitedPointerPos.X - Location.X, Size.Height);
-                    break;
-
-                case ResizeThumb.TopLeft:
-                    var deltaTopLeft = new Point(limitedPointerPos.X - Location.X, limitedPointerPos.Y - Location.Y);
-                    deltaTopLeft = new Point(Size.Width - Math.Max(MinSize.Width, Size.Width - deltaTopLeft.X),
-                                             Size.Height - Math.Max(MinSize.Height, Size.Height - deltaTopLeft.Y));
-                    deltaTopLeft = new Point(Size.Width - Math.Min(MaxSize.Width, Size.Width - deltaTopLeft.X),
-                                             Size.Height - Math.Min(MaxSize.Height, Size.Height - deltaTopLeft.Y));
-                    Location = new Point(Location.X + deltaTopLeft.X, Location.Y + deltaTopLeft.Y);
-                    Size = new Size(Size.Width - deltaTopLeft.X, Size.Height - deltaTopLeft.Y);
-                    break;
-
-                case ResizeThumb.TopRight:
-                    var deltaTopRight = limitedPointerPos.Y - Location.Y;
-                    deltaTopRight = Size.Height - Math.Max(MinSize.Height, Size.Height - deltaTopRight);
-                    deltaTopRight = Size.Height - Math.Min(MaxSize.Height, Size.Height - deltaTopRight);
-                    Location = new Point(Location.X, Location.Y + deltaTopRight);
-                    Size = new Size(limitedPointerPos.X - Location.X, Size.Height - deltaTopRight);
-                    break;
-
-                case ResizeThumb.BottomLeft:
-                    var deltaBottomLeft = limitedPointerPos.X - Location.X;
-                    deltaBottomLeft = Size.Width - Math.Max(MinSize.Width, Size.Width - deltaBottomLeft);
-                    deltaBottomLeft = Size.Width - Math.Min(MaxSize.Width, Size.Width - deltaBottomLeft);
-                    Location = new Point(Location.X + deltaBottomLeft, Location.Y); ;
-                    Size = new Size(Size.Width - deltaBottomLeft, limitedPointerPos.Y - Location.Y);
-                    break;
-
-                case ResizeThumb.BottomRight:
-                    Size = new Size(limitedPointerPos.X - Location.X, limitedPointerPos.Y - Location.Y);
-                    break;
-            }
-        }
-    }
-
     #region Public methods
-
-    /// <summary>
-    /// Minimize window.
-    /// </summary>
-    public void Minimize() => Minimized = true;
-
-    /// <summary>
-    /// Maximize window.
-    /// </summary>
-    public void Maximize() => Maximized = true;
-
-    /// <summary>
-    /// Restore window when maximized.
-    /// </summary>
-    public void Restore() => Maximized = false;
 
     /// <summary>
     /// Close window.
@@ -750,6 +752,21 @@ public sealed partial class CustomWindow
         Window.Topmost = true;
         Window.Topmost = false;
     }
+
+    /// <summary>
+    /// Maximize window.
+    /// </summary>
+    public void Maximize() => Maximized = true;
+
+    /// <summary>
+    /// Minimize window.
+    /// </summary>
+    public void Minimize() => Minimized = true;
+
+    /// <summary>
+    /// Restore window when maximized.
+    /// </summary>
+    public void Restore() => Maximized = false;
 
     #endregion Public methods
 }
