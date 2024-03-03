@@ -1,6 +1,6 @@
 ﻿using System;
 using Microsoft.Extensions.DependencyInjection;
-using Photino.Blazor.CustomWindow.Services;
+using Photino.Blazor.CustomWindow.Extensions;
 
 namespace Photino.Blazor.CustomWindow.Sample
 {
@@ -12,7 +12,7 @@ namespace Photino.Blazor.CustomWindow.Sample
             var appBuilder = PhotinoBlazorAppBuilder.CreateDefault(args);
 
             appBuilder.Services
-                .AddSingleton<ScreensAgentService>()
+                .AddCustomWindow()
                 .AddLogging();
 
             // register root component and selector
