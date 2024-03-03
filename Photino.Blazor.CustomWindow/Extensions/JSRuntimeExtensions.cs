@@ -1,24 +1,26 @@
-﻿using System;
+﻿using Microsoft.AspNetCore.Components;
 using System.Drawing;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Components;
 
 namespace Microsoft.JSInterop;
 
 // Global JavaScript functions
 /*
 function invokeElementMethod(element, methodName, ...args) {
-    element[methodName](args);
+    if (element)
+        element[methodName](args);
 }
 function getElementPropertyValue(element, propertyName) {
-    return element[propertyName];
+    return element ? element[propertyName] : null;
 }
 function setElementProperty(element, propertyName, value) {
-    element[propertyName] = value;
+    if (element)
+        element[propertyName] = value;
 }
 function getElementBounds(element) {
+    if (!element)
+        return null;
     var bounds = element.getBoundingClientRect();
-    return [rect.left, rect.top, rect.width, rect.height];
+    return [bounds.left, bounds.top, bounds.width, bounds.height, window.devicePixelRatio];
 }
 */
 
@@ -37,11 +39,7 @@ public static class JSRuntimeExtensions
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous invocation operation.</returns>
     public static async ValueTask InvokeElementMethodAsync(this IJSRuntime jsRuntime, ElementReference element, string methodName, params object[] args)
     {
-        if (jsRuntime is null)
-        {
-            throw new ArgumentNullException(nameof(jsRuntime));
-        }
-
+        ArgumentNullException.ThrowIfNull(jsRuntime);
         await jsRuntime.InvokeVoidAsync("invokeElementMethod", element, methodName, args);
     }
 
@@ -55,6 +53,7 @@ public static class JSRuntimeExtensions
     /// <returns>An instance of <typeparamref name="TValue"/> obtained by JSON-deserializing the return value.</returns>
     public static async ValueTask<TValue> GetElementPropertyValueAsync<TValue>(this IJSRuntime jsRuntime, ElementReference element, string propertyName)
     {
+        ArgumentNullException.ThrowIfNull(jsRuntime);
         return await jsRuntime.InvokeAsync<TValue>("getElementPropertyValue", element, propertyName);
     }
 
@@ -68,6 +67,7 @@ public static class JSRuntimeExtensions
     /// <returns>A <see cref="ValueTask"/> that represents the asynchronous invocation operation.</returns>
     public static async ValueTask SetElementPropertyAsync(this IJSRuntime jsRuntime, ElementReference element, string propertyName, object value)
     {
+        ArgumentNullException.ThrowIfNull(jsRuntime);
         await jsRuntime.InvokeVoidAsync("setElementProperty", element, propertyName, value);
     }
 
@@ -80,6 +80,8 @@ public static class JSRuntimeExtensions
     /// <returns>Given <see cref="ElementReference" /> bounds rectangle, converted to <see cref="Rectangle"/> type</returns>
     public static async ValueTask<(Rectangle, double)> GetElementBounds(this IJSRuntime jsRuntime, ElementReference element, bool returnScaled = false)
     {
+        ArgumentNullException.ThrowIfNull(jsRuntime);
+        
         var bounds = await jsRuntime.InvokeAsync<double[]>("getElementBounds", element);
         if (bounds is null)
             return (Rectangle.Empty, -1);

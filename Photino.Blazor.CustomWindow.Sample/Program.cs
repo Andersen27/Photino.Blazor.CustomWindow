@@ -4,10 +4,10 @@ using Photino.Blazor.CustomWindow.Services;
 
 namespace Photino.Blazor.CustomWindow.Sample
 {
-    class Program
+    internal class Program
     {
         [STAThread]
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             var appBuilder = PhotinoBlazorAppBuilder.CreateDefault(args);
 

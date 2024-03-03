@@ -31,7 +31,7 @@ public sealed partial class CustomWindow
         BottomRight,
     }
 
-    private static HashSet<PhotinoWindow> _allInitedWindows = new();
+    private static HashSet<PhotinoWindow> _allInitedWindows = [];
 
     private ElementReference headerDragArea;
     private ElementReference resizeThumbLeft, resizeThumbRight,
@@ -420,7 +420,7 @@ public sealed partial class CustomWindow
 
     protected override async Task OnInitializedAsync()
     {
-        await ScreensAgentService.Init(JSRuntime);
+        await ScreensAgentService.Initialize(JSRuntime);
 
         if (_allInitedWindows.Contains(Window))
             return;
