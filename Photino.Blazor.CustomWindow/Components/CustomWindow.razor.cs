@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
+using Photino.Blazor.CustomWindow.Services;
 using PhotinoNET;
 using System;
 using System.Collections.Generic;
@@ -30,7 +31,7 @@ public sealed partial class CustomWindow
         BottomRight,
     }
 
-    private static HashSet<PhotinoWindow> _allInitedWindows = new();
+    private static HashSet<PhotinoWindow> _allInitedWindows = [];
 
     private ElementReference headerDragArea;
     private ElementReference resizeThumbLeft, resizeThumbRight,
@@ -47,6 +48,7 @@ public sealed partial class CustomWindow
     private Point _headerPointerOffset;
     private Point _restoreLocation;
     private Size _restoreSize;
+    private Rectangle? _maximizeWorkArea;
 
     private PhotinoWindow Window => PhotinoBlazorApp.MainWindow;
     private string IconSource => Icon ?? Path.GetFileName(Window.IconFile);
@@ -54,6 +56,9 @@ public sealed partial class CustomWindow
 
     [Inject]
     private PhotinoBlazorApp PhotinoBlazorApp { get; set; }
+
+    [Inject]
+    private ScreensAgentService ScreensAgentService { get; set; }
 
     [Inject]
     private IJSRuntime JSRuntime { get; set; }
@@ -185,7 +190,7 @@ public sealed partial class CustomWindow
             var location = Window.Location;
             if (!location.Equals(value))
             {
-                value = new Point(value.X, Math.Max(0, value.Y));
+                value = new Point(value.X, value.Y);
                 Window.Location = value;
                 LocationChanged.InvokeAsync(value);
             }
@@ -239,9 +244,26 @@ public sealed partial class CustomWindow
                 {
                     _restoreLocation = Location;
                     _restoreSize = Size;
-                    var screenArea = PhotinoBlazorApp.MainWindow.MainMonitor.WorkArea;
-                    Size = screenArea.Size;
-                    Location = screenArea.Location;
+                    
+                    if (!_maximizeWorkArea.HasValue)
+                    {
+                        var maxSquare = 0;
+                        var windowArea = new Rectangle(Location, Size);
+                        foreach(var monitor in Window.Monitors)
+                        {
+                            var intersectArea = monitor.MonitorArea;
+                            intersectArea.Intersect(windowArea);
+                            var square = intersectArea.Width * intersectArea.Height;
+                            if (square > maxSquare)
+                            {
+                                maxSquare = square;
+                                _maximizeWorkArea = monitor.WorkArea;
+                            }
+                        }
+                    }
+
+                    Size = _maximizeWorkArea.Value.Size;
+                    Location = _maximizeWorkArea.Value.Location;
                 }
                 else
                 {
@@ -252,6 +274,7 @@ public sealed partial class CustomWindow
                 ResizeAvailable = !value;
                 _maximized = value;
                 _expanded = value;
+                _maximizeWorkArea = null;
                 MaximizedChanged.InvokeAsync(value);
             }
         }
@@ -363,7 +386,7 @@ public sealed partial class CustomWindow
     public event WindowClosingHandler WindowClosing;
 
     /// <summary>
-    /// Window moving event. Passes <see cref="MouseEventArgs"/> of header moving process.
+    /// Window moving event. Passes <see cref="PointerEventArgs"/> of header moving process.
     /// </summary>
     public event WindowMovingHandler WindowMoving;
 
@@ -392,11 +415,13 @@ public sealed partial class CustomWindow
     public delegate void WindowMaximizedHandler(bool maximized);
     public delegate void WindowMinimizedHandler();
     public delegate bool WindowClosingHandler();
-    public delegate void WindowMovingHandler(MouseEventArgs e);
+    public delegate void WindowMovingHandler(PointerEventArgs e);
     #endregion
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        await ScreensAgentService.Initialize(JSRuntime);
+
         if (_allInitedWindows.Contains(Window))
             return;
 
@@ -437,14 +462,12 @@ public sealed partial class CustomWindow
     private Rectangle GetPointerGlobalWorkArea(Point pointerScreenPos)
     {
         var monitor = Window.Monitors.Single(m => m.MonitorArea.Contains(pointerScreenPos));
-        var workArea = monitor.WorkArea;
-        workArea.Offset(monitor.MonitorArea.Location);
-        return workArea;
+        return monitor.WorkArea;
     }
 
-    private void UpdateMoveExpand(MouseEventArgs e)
+    private void UpdateMoveExpand(PointerEventArgs e)
     {
-        var pointerScreenPos = new Point((int)e.ScreenX, (int)e.ScreenY);
+        var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
         var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
 
         if (pointerScreenPos.X < workArea.X + BordersExpandThreshold &&
@@ -495,6 +518,7 @@ public sealed partial class CustomWindow
         }
         else if (pointerScreenPos.Y < workArea.Y + BordersExpandThreshold)
         {
+            _maximizeWorkArea = workArea;
             Maximized = true;
         }
         else if (pointerScreenPos.Y > workArea.Location.Y + workArea.Height - 1 - BordersExpandThreshold)
@@ -506,12 +530,12 @@ public sealed partial class CustomWindow
         }
     }
 
-    private void UpdateResizeExpand(ResizeThumb resizeThumb, MouseEventArgs e)
+    private void UpdateResizeExpand(ResizeThumb resizeThumb, PointerEventArgs e)
     {
         if (resizeThumb is ResizeThumb.Left or ResizeThumb.Right)
             return;
 
-        var pointerScreenPos = new Point((int)e.ScreenX, (int)e.ScreenY);
+        var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
         var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
 
         if (pointerScreenPos.Y < workArea.Y + BordersExpandThreshold ||
@@ -529,7 +553,11 @@ public sealed partial class CustomWindow
         if (e.Button == 0)
         {
             _movingProcess = true;
-            _headerPointerOffset = new Point((int)e.OffsetX, (int)e.OffsetY);
+
+            var scale = ScreensAgentService.GetPointerPositionScaleFactor(e);
+            _headerPointerOffset = new Point((int)(e.OffsetX * scale),
+                                             (int)(e.OffsetY * scale));
+
             await JSRuntime.InvokeElementMethodAsync(headerDragArea, "setPointerCapture", e.PointerId);
             WindowMoveBegin?.Invoke();
         }
@@ -544,6 +572,11 @@ public sealed partial class CustomWindow
 
             if (EnableExpand)
                 UpdateMoveExpand(e);
+
+            // hack to force update layout scale when working with different scaled screens
+            var targetSize = Size;
+            Window.Size = new Size(targetSize.Width, targetSize.Height - 1);
+            Window.Size = targetSize;
         }
     }
 
@@ -565,10 +598,10 @@ public sealed partial class CustomWindow
                     Maximized = false; 
             }
 
-            var pointerScreenPos = new Point((int)e.ScreenX, (int)e.ScreenY);
+            var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
             var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
             var limitedPointerPos = new Point(Math.Min(workArea.X + workArea.Width, Math.Max(workArea.X, pointerScreenPos.X)),
-                                              Math.Min(workArea.Y + workArea.Height, Math.Max(workArea.Y, pointerScreenPos.Y)));
+                                              Math.Min(workArea.Y + workArea.Height, Math.Max(workArea.Y + _headerPointerOffset.Y, pointerScreenPos.Y)));
 
             Location = new Point(limitedPointerPos.X - _headerPointerOffset.X, limitedPointerPos.Y - _headerPointerOffset.Y);
             WindowMoving?.Invoke(e);
@@ -618,7 +651,7 @@ public sealed partial class CustomWindow
     {
         if (_movingProcess)
         {
-            var pointerScreenPos = new Point((int)e.ScreenX, (int)e.ScreenY);
+            var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
             var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
             var limitedPointerPos = new Point(Math.Min(workArea.X + workArea.Width, Math.Max(workArea.X, pointerScreenPos.X)),
                                               Math.Min(workArea.Y + workArea.Height, Math.Max(workArea.Y, pointerScreenPos.Y)));

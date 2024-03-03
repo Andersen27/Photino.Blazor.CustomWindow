@@ -2,11 +2,13 @@
 
     <PropertyGroup>
         <TargetFrameworks>net7.0;net8.0</TargetFrameworks>
+        <LangVersion>latest</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <WarningsNotAsErrors>BL0007</WarningsNotAsErrors>
 
         <Authors>Andersen27</Authors>
-        <Version>1.0.2-alpha</Version>
+        <Version>1.1.0</Version>
         <PackageId>Photino.Blazor.CustomWindow</PackageId>
         <Title>Photino.Blazor.CustomWindow</Title>
         <Description>Customizable window view and behaviour implementation for Photino.Blazor applications with Chromeless mode</Description>

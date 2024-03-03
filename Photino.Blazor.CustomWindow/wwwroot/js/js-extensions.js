@@ -10,7 +10,8 @@ function setElementProperty(element, propertyName, value) {
         element[propertyName] = value;
 }
 function getElementBounds(element) {
-    if (!element) return null;
+    if (!element)
+        return null;
     var bounds = element.getBoundingClientRect();
-    return [bounds.left, bounds.top, bounds.width, bounds.height];
+    return [bounds.left, bounds.top, bounds.width, bounds.height, window.devicePixelRatio];
 }
