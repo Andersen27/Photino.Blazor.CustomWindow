@@ -78,9 +78,15 @@ public static class JSRuntimeExtensions
     /// <typeparam name="TValue">The JSON-serializable return type.</typeparam>
     /// <param name="jsRuntime">The <see cref="IJSRuntime"/>.</param>
     /// <returns>Given <see cref="ElementReference" /> bounds rectangle, converted to <see cref="Rectangle"/> type</returns>
-    public static async ValueTask<Rectangle> GetElementBounds(this IJSRuntime jsRuntime, ElementReference element, bool returnScaled = false)
+    public static async ValueTask<(Rectangle, double)> GetElementBounds(this IJSRuntime jsRuntime, ElementReference element, bool returnScaled = false)
     {
-        var bounds = await jsRuntime.InvokeAsync<double[]>("getElementBounds", element, returnScaled);
-        return bounds is null ? Rectangle.Empty : new Rectangle((int)bounds[0], (int)bounds[1], (int)bounds[2], (int)bounds[3]);
+        var bounds = await jsRuntime.InvokeAsync<double[]>("getElementBounds", element);
+        if (bounds is null)
+            return (Rectangle.Empty, -1);
+
+        var scaleFactor = bounds[4];
+        var boundsScale = returnScaled ? scaleFactor : 1.0;
+        return (new Rectangle((int)(bounds[0] * boundsScale), (int)(bounds[1] * boundsScale),
+                              (int)(bounds[2] * boundsScale), (int)(bounds[3] * boundsScale)), scaleFactor);
     }
 }

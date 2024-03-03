@@ -9,10 +9,9 @@ function setElementProperty(element, propertyName, value) {
     if (element)
         element[propertyName] = value;
 }
-function getElementBounds(element, returnScaled) {
-    if (!element) return null;
-    var scale = returnScaled ? window.devicePixelRatio : 1;
+function getElementBounds(element) {
+    if (!element)
+        return null;
     var bounds = element.getBoundingClientRect();
-    return [bounds.left * scale, bounds.top * scale,
-    bounds.width * scale, bounds.height * scale];
+    return [bounds.left, bounds.top, bounds.width, bounds.height, window.devicePixelRatio];
 }
