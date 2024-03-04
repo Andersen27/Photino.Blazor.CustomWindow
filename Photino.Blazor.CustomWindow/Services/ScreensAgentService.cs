@@ -15,13 +15,16 @@ public class ScreensAgentService
         public int ActualTop { get; set; }
         public bool PositionActualized { get; set; } = false;
     }
+
     private IJSObjectReference _jsModule;
+    private Task _updateScreensInfoTask;
     private List<ScreenInfo> _screensInfo;
 
     public bool Inited => _screensInfo != null;
 
-    public Point GetOSPointerPosition(PointerEventArgs e)
+    public async Task<Point> GetOSPointerPositionAsync(PointerEventArgs e)
     {
+        await _updateScreensInfoTask;
         var pointerScreenPos = new Point((int)e.ScreenX, (int)e.ScreenY);
         var screen = _screensInfo.First(s => s.OriginalArea.Contains(pointerScreenPos));
         pointerScreenPos.Offset(-screen.OriginalArea.Left, -screen.OriginalArea.Top);
@@ -29,27 +32,30 @@ public class ScreensAgentService
                          screen.ActualTop + (int)(pointerScreenPos.Y * screen.ScaleFactor));
     }
 
-    public double GetPointerPositionScaleFactor(PointerEventArgs e)
+    public async Task<double> GetPointerPositionScaleFactorAsync(PointerEventArgs e)
     {
+        await _updateScreensInfoTask;
         var pointerScreenPos = new Point((int)e.ScreenX, (int)e.ScreenY);
         var screen = _screensInfo.First(s => s.OriginalArea.Contains(pointerScreenPos));
         return screen.ScaleFactor;
     }
 
-    public async Task Initialize(IJSRuntime jsRuntime)
+    public async Task InitializeIfNeed(IJSRuntime jsRuntime)
     {
         if (!Inited)
         {
             _jsModule = await jsRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/Photino.Blazor.CustomWindow/js/pb-screens-agent.js");
-            await UpdateScreensInfo();
+            _updateScreensInfoTask = UpdateScreensInfo();
         }
     }
 
     public async Task UpdateScreensInfo()
     {
-        _screensInfo = [];
-
+        // when the application is launched for the first time, "window-management" permission must be granted.
+        // transient activation is required to request permission, so this call can wait for the first transient activation.
         var screensInfo = await _jsModule.InvokeAsync<JsonElement[]>("getScreensInfo");
+
+        _screensInfo = [];
         foreach (var screen in screensInfo)
         {
             _screensInfo.Add(new ScreenInfo()

@@ -3,13 +3,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using Photino.Blazor.CustomWindow.Services;
 using PhotinoNET;
-using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
-
 namespace Photino.Blazor.CustomWindow.Components;
 
 /// <summary>
@@ -420,7 +414,7 @@ public sealed partial class CustomWindow
 
     protected override async Task OnInitializedAsync()
     {
-        await ScreensAgentService.Initialize(JSRuntime);
+        await ScreensAgentService.InitializeIfNeed(JSRuntime);
 
         if (_allInitedWindows.Contains(Window))
             return;
@@ -465,9 +459,9 @@ public sealed partial class CustomWindow
         return monitor.WorkArea;
     }
 
-    private void UpdateMoveExpand(PointerEventArgs e)
+    private async void UpdateMoveExpandAsync(PointerEventArgs e)
     {
-        var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
+        var pointerScreenPos = await ScreensAgentService.GetOSPointerPositionAsync(e);
         var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
 
         if (pointerScreenPos.X < workArea.X + BordersExpandThreshold &&
@@ -530,12 +524,12 @@ public sealed partial class CustomWindow
         }
     }
 
-    private void UpdateResizeExpand(ResizeThumb resizeThumb, PointerEventArgs e)
+    private async void UpdateResizeExpandAsync(ResizeThumb resizeThumb, PointerEventArgs e)
     {
         if (resizeThumb is ResizeThumb.Left or ResizeThumb.Right)
             return;
 
-        var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
+        var pointerScreenPos = await ScreensAgentService.GetOSPointerPositionAsync(e);
         var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
 
         if (pointerScreenPos.Y < workArea.Y + BordersExpandThreshold ||
@@ -554,7 +548,7 @@ public sealed partial class CustomWindow
         {
             _movingProcess = true;
 
-            var scale = ScreensAgentService.GetPointerPositionScaleFactor(e);
+            var scale = await ScreensAgentService.GetPointerPositionScaleFactorAsync(e);
             _headerPointerOffset = new Point((int)(e.OffsetX * scale),
                                              (int)(e.OffsetY * scale));
 
@@ -571,7 +565,7 @@ public sealed partial class CustomWindow
             WindowMoveEnd?.Invoke();
 
             if (EnableExpand)
-                UpdateMoveExpand(e);
+                UpdateMoveExpandAsync(e);
 
             // hack to force update layout scale when working with different scaled screens
             var targetSize = Size;
@@ -580,7 +574,7 @@ public sealed partial class CustomWindow
         }
     }
 
-    private void OnHeaderPointerMove(PointerEventArgs e)
+    private async void OnHeaderPointerMoveAsync(PointerEventArgs e)
     {
         if (_movingProcess)
         {
@@ -598,7 +592,7 @@ public sealed partial class CustomWindow
                     Maximized = false; 
             }
 
-            var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
+            var pointerScreenPos = await ScreensAgentService.GetOSPointerPositionAsync(e);
             var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
             var limitedPointerPos = new Point(Math.Min(workArea.X + workArea.Width, Math.Max(workArea.X, pointerScreenPos.X)),
                                               Math.Min(workArea.Y + workArea.Height, Math.Max(workArea.Y + _headerPointerOffset.Y, pointerScreenPos.Y)));
@@ -643,15 +637,15 @@ public sealed partial class CustomWindow
             _movingProcess = false;
 
             if (EnableExpand)
-                UpdateResizeExpand(_activeResizeThumb, e);
+                UpdateResizeExpandAsync(_activeResizeThumb, e);
         }
     }
 
-    private void OnResizeThumbPointerMove(PointerEventArgs e)
+    private async void OnResizeThumbPointerMoveAsync(PointerEventArgs e)
     {
         if (_movingProcess)
         {
-            var pointerScreenPos = ScreensAgentService.GetOSPointerPosition(e);
+            var pointerScreenPos = await ScreensAgentService.GetOSPointerPositionAsync(e);
             var workArea = GetPointerGlobalWorkArea(pointerScreenPos);
             var limitedPointerPos = new Point(Math.Min(workArea.X + workArea.Width, Math.Max(workArea.X, pointerScreenPos.X)),
                                               Math.Min(workArea.Y + workArea.Height, Math.Max(workArea.Y, pointerScreenPos.Y)));
