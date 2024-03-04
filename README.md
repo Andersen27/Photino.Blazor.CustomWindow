@@ -13,6 +13,7 @@ Default control buttons allow to minimize, maximize and close the window. At the
 3. Add CustomWindow to your Photino.Blazor application service collection with `AddCustomWindow()` extension.
 4. Use `CustomWindow` component as root in your markup and place your content to its `WindowContent` RenderFragment (see [example](Photino.Blazor.CustomWindow.Sample/Shared/MainLayout.razor)).
 5. Don't forget to set the `PhotinoWindow.Chromeless` property to true.
+6. Override --pb-custom-window-[. . .] css variables for styling ([default values here](Photino.Blazor.CustomWindow/wwwroot/css/pb-custom-window.css)).
 
 ## Problems
 - When Blazor catch an unhandled error, entire window freezes including any interaction with CustomWindow. This can only be solved by creating a solution based on JavaScript and not Blazor.

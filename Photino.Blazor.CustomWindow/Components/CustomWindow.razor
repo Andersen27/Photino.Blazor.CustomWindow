@@ -2,10 +2,7 @@
 @using System.Drawing
 
 <div class="pb-custom-window" @attributes="@AdditionalAttributes"
-     style="width: 100vw; height: 100vh;
-            --pb-custom-window-color: @WindowColor;
-            --pb-custom-window-title-color: @TitleColor;
-            --pb-custom-window-header-height: @(HeaderHeight)px; @Style">
+     style="width: 100vw; height: 100vh; --pb-custom-window-header-height: @(HeaderHeight)px; @Style">
     <div style="position: fixed; width: 100vw; height: 100vh; display: grid; grid-template-rows: var(--pb-custom-window-header-height) 1fr">
         <div class="pb-custom-window-header" style="-webkit-user-select: none;">
             <div @ref="headerDragArea" style="display: flex; align-items: center;"
@@ -48,7 +45,7 @@
                 {
                     <div class="pb-custom-window-control-buttons">
                         <button @onclick="Minimize"
-                                class="pb-custom-window-control-button pb-custom-window-minimize-button">
+                                class="pb-custom-window-control-button">
                             @if(MinimizeButtonContent is null)
                             {
                                 <svg viewBox="0 0 22 22"><path d="m6,11h10v1h-10z" /></svg>
@@ -62,7 +59,7 @@
                         @if (Maximized)
                         {
                             <button @onclick="Restore"
-                                    class="pb-custom-window-control-button pb-custom-window-restore-button">
+                                    class="pb-custom-window-control-button">
                                 @if (RestoreButtonContent is null)
                                 {
                                     <svg viewBox="0 0 22 22"><path d="m6,9h7v7h-7zm1,1v5h5v-5zm1,-2v-2h8v8h-2v-1h1v-6h-6v1z" /></svg>
@@ -76,7 +73,7 @@
                         else
                         {
                             <button @onclick="Maximize"
-                                    class="pb-custom-window-control-button pb-custom-window-maximize-button">
+                                    class="pb-custom-window-control-button">
                                 @if (MaximizeButtonContent is null)
                                 {
                                     <svg viewBox="0 0 22 22"><path d="m6,6h10v10h-10zm1,1v8h8v-8z" /></svg>
@@ -107,7 +104,7 @@
                 }
             </div>
         </div>
-        <div style="position: relative; overflow: hidden; margin: 0 1px 1px 1px; background-color: white">
+        <div style="position: relative; overflow: hidden; margin: 0 1px 1px 1px; background-color: var(--pb-custom-window-background-color)">
             @WindowContent
         </div>
     </div>

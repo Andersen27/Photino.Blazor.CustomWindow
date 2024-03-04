@@ -13,18 +13,6 @@ namespace Photino.Blazor.CustomWindow.Components;
 /// </summary>
 public sealed partial class CustomWindow
 {
-    private enum ResizeThumb
-    {
-        Top,
-        Bottom,
-        Left,
-        Right,
-        TopLeft,
-        TopRight,
-        BottomLeft,
-        BottomRight,
-    }
-
     private static HashSet<PhotinoWindow> _allInitedWindows = [];
 
     private ElementReference headerDragArea;
@@ -131,18 +119,6 @@ public sealed partial class CustomWindow
     /// </summary>
     [Parameter]
     public string Icon { get; set; } = null;
-
-    /// <summary>
-    /// CSS-based color of custom window. This includes header background and borders color.
-    /// </summary>
-    [Parameter]
-    public string WindowColor { get; set; } = "white";
-
-    /// <summary>
-    /// CSS-based color of header title text.
-    /// </summary>
-    [Parameter]
-    public string TitleColor { get; set; } = "black";
 
     /// <summary>
     /// Minimum allowable window size.
