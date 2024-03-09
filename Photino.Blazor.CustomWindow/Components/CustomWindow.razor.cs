@@ -437,9 +437,12 @@ public sealed partial class CustomWindow
         };
         Window.WindowFocusOut += (_, _) =>
         {
-            _windowsCollection[Window]._focused = false;
-            _windowsCollection[Window].InvokeAsync(_windowsCollection[Window].StateHasChanged);
-            _windowsCollection[Window].WindowFocusOut?.Invoke();
+            if (_windowsCollection.ContainsKey(Window))
+            {
+                _windowsCollection[Window]._focused = false;
+                _windowsCollection[Window].InvokeAsync(_windowsCollection[Window].StateHasChanged);
+                _windowsCollection[Window].WindowFocusOut?.Invoke();
+            }
         };
     }
 
