@@ -7,7 +7,7 @@
 <CustomWindow Title="Custom Window Demo">
     <HeaderExtraControlsLayout>
         <div style="width: @(ProfileClicked ? "125px" : "0"); transition: 0.5s; overflow: hidden">
-            <p style="margin: 0 10px; text-wrap: nowrap; color: white">Profile message!</p>
+            <p style="margin: auto; text-wrap: nowrap; color: white">Profile message!</p>
         </div>
         <button class="pb-custom-window-control-button" style="background: transparent"
                 @onclick="() => ProfileClicked = !ProfileClicked">

@@ -1,46 +1,64 @@
 :root {
     --pb-custom-window-main-color: white;
-    --pb-custom-window-title-color: black;
+    --pb-custom-window-main-unfocused-color: white;
     --pb-custom-window-background-color: white;
-    --pb-custom-window-close-control-color: firebrick;
-    --pb-custom-window-controls-color: rgba(0,0,0,.25); /* rgba(255,255,255,.25); */
-    --pb-custom-window-controls-color-hover: rgba(0,0,0,.5); /* rgba(255,255,255,.5); */
+    --pb-custom-window-title-color: black;
+    --pb-custom-window-controls-color: white;
+    --pb-custom-window-close-control-background: firebrick;
+    --pb-custom-window-controls-background: rgba(0,0,0,.25); /* rgba(255,255,255,.25); */
+    --pb-custom-window-controls-background-hover: rgba(0,0,0,.5); /* rgba(255,255,255,.5); */
 }
 
 .pb-custom-window {
     background-color: var(--pb-custom-window-main-color);
 }
-
     .pb-custom-window > * {
-        position: absolute;
+        position: fixed;
     }
 
-.pb-custom-window-header {
-    display: grid;
-    grid-template-columns: 1fr auto auto; /* main, extra controls, controls */
-    overflow: hidden;
-    font-size: calc(var(--pb-custom-window-header-height) / 2);
+.pb-custom-window-unfocused {
+    --pb-custom-window-main-color: var(--pb-custom-window-main-unfocused-color);
 }
 
-    .pb-custom-window-header > div {
-        height: 100%;
-        overflow: hidden;
-    }
+.pb-custom-window-header {
+    height: var(--pb-custom-window-header-height);
+    align-items: center;
+    font-size: calc(var(--pb-custom-window-header-height) / 2);
+    overflow: hidden;
+    -webkit-user-select: none;
+    pointer-events: none;
+}
 
 .pb-custom-window-icon {
+    overflow: hidden;
+    -webkit-user-select: none;
+    pointer-events: none;
 }
 
 .pb-custom-window-title {
     color: var(--pb-custom-window-title-color);
-    font-family: sans-serif;
     margin: 0;
-    overflow: hidden;
     line-height: 1.5;
-    text-wrap: nowrap;
+    white-space: nowrap;
+    overflow: hidden;
     text-overflow: ellipsis;
 }
+.pb-custom-window-unfocused .pb-custom-window-title {
+    opacity: 0.6;
+}
 
-.pb-custom-window-control-buttons {
+.pb-custom-window-central-area {
+    pointer-events: none;
+    flex-grow: 1;
+}
+
+.pb-custom-window-controls {
+    background-color: var(--pb-custom-window-main-color);
+    overflow: hidden;
+    -webkit-user-select: none;
+}
+
+.pb-custom-window-control-buttons, .pb-custom-window-extra-controls {
     height: 100%;
     display: flex;
     align-items: center;
@@ -50,10 +68,10 @@
 
 .pb-custom-window-control-button {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
+    justify-content: stretch;
     height: calc(var(--pb-custom-window-header-height) - 6px);
-    background-color: var(--pb-custom-window-controls-color);
+    background-color: var(--pb-custom-window-controls-background);
     aspect-ratio: 1;
     border-radius: 3px;
     border: none;
@@ -62,7 +80,7 @@
 }
 
     .pb-custom-window-control-button:hover {
-        background-color: var(--pb-custom-window-controls-color-hover);
+        background-color: var(--pb-custom-window-controls-background-hover);
     }
 
     .pb-custom-window-control-button:focus {
@@ -70,7 +88,7 @@
     }
 
     .pb-custom-window-control-button > svg {
-        fill: white;
+        fill: var(--pb-custom-window-controls-color);
     }
 
     .pb-custom-window-control-button > img {
@@ -78,5 +96,5 @@
     }
 
 .pb-custom-window-close-button {
-    background-color: var(--pb-custom-window-close-control-color);
+    background-color: var(--pb-custom-window-close-control-background);
 }

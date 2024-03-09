@@ -1,4 +1,5 @@
 :root {
     --pb-custom-window-main-color: #1e88e5;
+    --pb-custom-window-main-unfocused-color: #3887cc;
     --pb-custom-window-title-color: white;
 }

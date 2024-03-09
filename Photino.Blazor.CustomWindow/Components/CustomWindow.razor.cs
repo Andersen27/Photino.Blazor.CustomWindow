@@ -16,6 +16,7 @@ public sealed partial class CustomWindow
     private static HashSet<PhotinoWindow> _allInitedWindows = [];
 
     private ElementReference headerDragArea;
+    private ElementReference controlsArea;
     private ElementReference resizeThumbLeft, resizeThumbRight,
                              resizeThumbTop, resizeThumbBottom,
                              resizeThumbTopLeft, resizeThumbTopRight,
@@ -26,7 +27,8 @@ public sealed partial class CustomWindow
     private bool _movingProcess;
     private bool _maximized;
     private bool _expanded;
-    private bool _focused;
+    private bool _focused = true;
+    private double _controlsWidth;
     private Point _headerPointerOffset;
     private Point _restoreLocation;
     private Size _restoreSize;
@@ -62,13 +64,19 @@ public sealed partial class CustomWindow
     public RenderFragment WindowContent { get; set; }
 
     /// <summary>
-    /// Razor layout for left side of window header. By default - window icon and title.
+    /// Razor layout for icon area. By default - standard window icon.
+    /// </summary>
+    [Parameter]
+    public RenderFragment HeaderIconLayout { get; set; } = null;
+
+    /// <summary>
+    /// Razor layout for left area of window header. By default - standard window title.
     /// </summary>
     [Parameter]
     public RenderFragment HeaderMainLayout { get; set; } = null;
 
     /// <summary>
-    /// Razor layout for central part of window header. By default - empty.
+    /// Razor layout for central area of window header. By default - empty.
     /// This is the main window drag area, so it's recommended not to overlay it
     /// with elements that have pointer events propagation.
     /// </summary>
@@ -76,7 +84,7 @@ public sealed partial class CustomWindow
     public RenderFragment HeaderCentralLayout { get; set; } = null;
 
     /// <summary>
-    /// Razor layout for right side of window header. By default - three standard control buttons:
+    /// Razor layout for right area of window header. By default - three standard control buttons:
     /// minimize, maximize/restore and close.
     /// </summary>
     [Parameter]
@@ -280,7 +288,7 @@ public sealed partial class CustomWindow
     /// Custom header height in screen pixels.
     /// </summary>
     [Parameter]
-    public uint HeaderHeight { get; set; } = 28;
+    public uint HeaderHeight { get; init; } = 28;
 
     /// <summary>
     /// Invisible resize area width along window borders in screen pixels.
@@ -412,9 +420,29 @@ public sealed partial class CustomWindow
         Window.WindowMaximized += (_, _) => WindowMaximized?.Invoke(Window.Maximized);
         Window.WindowMinimized += (_, _) => WindowMinimized?.Invoke();
         Window.WindowClosing += (_, _) => OnWindowClosing();
-        Window.WindowFocusIn += (_, _) => { _focused = true; WindowFocusIn?.Invoke(); };
-        Window.WindowFocusOut += (_, _) => { _focused = false; WindowFocusOut?.Invoke(); };
+        Window.WindowFocusIn += (_, _) =>
+        { 
+            _focused = true;
+            InvokeAsync(StateHasChanged);
+            WindowFocusIn?.Invoke();
+        };
+        Window.WindowFocusOut += (_, _) =>
+        {
+            _focused = false;
+            InvokeAsync(StateHasChanged);
+            WindowFocusOut?.Invoke();
+        };
         _allInitedWindows.Add(Window);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var controlsBounds = await JSRuntime.GetElementBounds(controlsArea);
+            _controlsWidth = controlsBounds.Item1.Width;
+            StateHasChanged();
+        }
     }
 
     private bool OnWindowClosing()

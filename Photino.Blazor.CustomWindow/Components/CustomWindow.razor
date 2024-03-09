@@ -1,111 +1,136 @@
 ﻿@using Microsoft.AspNetCore.Components.Web
 @using System.Drawing
 
-<div class="pb-custom-window" @attributes="@AdditionalAttributes"
+<div class="pb-custom-window @(Focused ? "" : "pb-custom-window-unfocused")" @attributes="@AdditionalAttributes"
      style="width: 100vw; height: 100vh; --pb-custom-window-header-height: @(HeaderHeight)px; @Style">
-    <div style="position: fixed; width: 100vw; height: 100vh; display: grid; grid-template-rows: var(--pb-custom-window-header-height) 1fr">
-        <div class="pb-custom-window-header" style="-webkit-user-select: none;">
-            <div @ref="headerDragArea" style="display: flex; align-items: center;"
-                 @onpointerdown="OnHeaderPointerDownAsync" @onpointerup="OnHeaderPointerUp"
-                 @onpointermove="OnHeaderPointerMoveAsync" @ondblclick="OnHeaderDoubleClick">
-                @if(HeaderMainLayout is null)
-                {
-                    <div style="height: 100%; display: flex; gap: 5px; padding: 3px 5px; pointer-events: none;">
-                        @if (ShowIcon && !string.IsNullOrEmpty(IconSource))
-                        {
-                            <img class="pb-custom-window-icon" style="height: 100%" src="@(IconSource)" alt="" />
-                        }
-                        <p class="pb-custom-window-title">
-                           @Title
-                        </p>
-                    </div>
-                }
-                else
-                {
-                    @HeaderMainLayout
-                }
 
-                <div style="pointer-events: none; flex-grow: 1">
-                    @if (HeaderCentralLayout != null)
-                    {
-                        @HeaderCentralLayout
-                    }
-                </div>
+    <div style="top: var(--pb-custom-window-header-height); left: 1px;
+                height: calc(100vh - var(--pb-custom-window-header-height) - 1px); width: calc(100vw - 2px);
+                overflow: hidden; background-color: var(--pb-custom-window-background-color)">
+        @WindowContent
+    </div>
+
+    <div @ref="headerDragArea"
+         style="height: var(--pb-custom-window-header-height); width: 100vw;
+                background-color: var(--pb-custom-window-main-color)"
+         @onpointerdown="OnHeaderPointerDownAsync" @onpointerup="OnHeaderPointerUp"
+         @onpointermove="OnHeaderPointerMoveAsync" @ondblclick="OnHeaderDoubleClick"
+         @onpointerdown:preventDefault>
+    </div>
+
+    @if (ShowIcon)
+    {
+        <div class="pb-custom-window-icon"
+             style="display: flex; height: var(--pb-custom-window-header-height); aspect-ratio: 1">
+            @if (HeaderIconLayout is null)
+            {
+                if (!string.IsNullOrEmpty(IconSource))
+                {
+                    <img class="pb-custom-window-icon" style="padding: 2px" src="@(IconSource)" alt="" />
+                }
+            }
+            else
+            {
+                @HeaderIconLayout
+            }
+        </div>
+    }
+
+    <div class="pb-custom-window-header"
+         style="display: flex;
+                left: @(ShowIcon ? "var(--pb-custom-window-header-height)" : "0");
+                width: calc(100vw - @(ShowIcon ? "var(--pb-custom-window-header-height)" : "0px") - @(_controlsWidth)px)">
+        @if (HeaderMainLayout is null)
+        {
+            <p class="pb-custom-window-title" style="margin-left: @(ShowIcon ? "0px" :"calc(var(--pb-custom-window-header-height) / 4)")">
+                @Title
+            </p>
+        }
+        else
+        {
+            @HeaderMainLayout
+        }
+
+        @if (HeaderCentralLayout != null)
+        {
+            <div class="pb-custom-window-central-area">
+                @HeaderCentralLayout
             </div>
+        }
+    </div>
 
-            <div class="pb-custom-window-control-buttons">
-                @if (HeaderExtraControlsLayout != null)
-                {
-                    @HeaderExtraControlsLayout
-                }
+    <div @ref="controlsArea" class="pb-custom-window-controls"
+         style="height: var(--pb-custom-window-header-height); right: 0; display: flex">
+        
+        @if (HeaderExtraControlsLayout != null)
+        {
+            <div class="pb-custom-window-extra-controls">
+                @HeaderExtraControlsLayout
             </div>
+        }
 
-            <div>
-                @if(HeaderControlsLayout is null)
-                {
-                    <div class="pb-custom-window-control-buttons">
-                        <button @onclick="Minimize"
-                                class="pb-custom-window-control-button">
-                            @if(MinimizeButtonContent is null)
-                            {
-                                <svg viewBox="0 0 22 22"><path d="m6,11h10v1h-10z" /></svg>
-                            }
-                            else
-                            {
-                                @MinimizeButtonContent
-                            }
-                        </button>
-
-                        @if (Maximized)
+        <div>
+            @if (HeaderControlsLayout is null)
+            {
+                <div class="pb-custom-window-control-buttons">
+                    <button @onclick="Minimize"
+                            class="pb-custom-window-control-button">
+                        @if (MinimizeButtonContent is null)
                         {
-                            <button @onclick="Restore"
-                                    class="pb-custom-window-control-button">
-                                @if (RestoreButtonContent is null)
-                                {
-                                    <svg viewBox="0 0 22 22"><path d="m6,9h7v7h-7zm1,1v5h5v-5zm1,-2v-2h8v8h-2v-1h1v-6h-6v1z" /></svg>
-                                }
-                                else
-                                {
-                                    @RestoreButtonContent
-                                }
-                            </button>
+                            <svg viewBox="0 0 22 22"><path d="m6,11h10v1h-10z" /></svg>
                         }
                         else
                         {
-                            <button @onclick="Maximize"
-                                    class="pb-custom-window-control-button">
-                                @if (MaximizeButtonContent is null)
-                                {
-                                    <svg viewBox="0 0 22 22"><path d="m6,6h10v10h-10zm1,1v8h8v-8z" /></svg>
-                                }
-                                else
-                                {
-                                    @MaximizeButtonContent
-                                }
-                            </button>
+                            @MinimizeButtonContent
                         }
+                    </button>
 
-                        <button @onclick="Close"
-                                class="pb-custom-window-control-button pb-custom-window-close-button">
-                            @if (CloseButtonContent is null)
+                    @if (Maximized)
+                    {
+                        <button @onclick="Restore"
+                                class="pb-custom-window-control-button">
+                            @if (RestoreButtonContent is null)
                             {
-                                <svg viewBox="0 0 22 22"><path d="m6 7l1-1 4 4 4-4 1 1-4 4 4 4-1 1-4-4-4 4-1-1 4-4z" /></svg>
+                                <svg viewBox="0 0 22 22"><path d="m6,9h7v7h-7zm1,1v5h5v-5zm1,-2v-2h8v8h-2v-1h1v-6h-6v1z" /></svg>
                             }
                             else
                             {
-                                @CloseButtonContent
+                                @RestoreButtonContent
                             }
                         </button>
-                    </div>
-                }
-                else
-                {
-                    @HeaderControlsLayout
-                }
-            </div>
-        </div>
-        <div style="position: relative; overflow: hidden; margin: 0 1px 1px 1px; background-color: var(--pb-custom-window-background-color)">
-            @WindowContent
+                    }
+                    else
+                    {
+                        <button @onclick="Maximize"
+                                class="pb-custom-window-control-button">
+                            @if (MaximizeButtonContent is null)
+                            {
+                                <svg viewBox="0 0 22 22"><path d="m6,6h10v10h-10zm1,1v8h8v-8z" /></svg>
+                            }
+                            else
+                            {
+                                @MaximizeButtonContent
+                            }
+                        </button>
+                    }
+
+                    <button @onclick="Close"
+                            class="pb-custom-window-control-button pb-custom-window-close-button">
+                        @if (CloseButtonContent is null)
+                        {
+                            <svg viewBox="0 0 22 22"><path d="m6 7l1-1 4 4 4-4 1 1-4 4 4 4-1 1-4-4-4 4-1-1 4-4z" /></svg>
+                        }
+                        else
+                        {
+                            @CloseButtonContent
+                        }
+                    </button>
+                </div>
+            }
+            else
+            {
+                @HeaderControlsLayout
+            }
         </div>
     </div>
 
