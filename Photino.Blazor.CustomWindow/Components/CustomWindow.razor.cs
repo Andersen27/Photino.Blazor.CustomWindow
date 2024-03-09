@@ -13,7 +13,7 @@ namespace Photino.Blazor.CustomWindow.Components;
 /// </summary>
 public sealed partial class CustomWindow
 {
-    private static HashSet<PhotinoWindow> _allInitedWindows = [];
+    private static Dictionary<PhotinoWindow, CustomWindow> _windowsCollection = [];
 
     private ElementReference headerDragArea;
     private ElementReference controlsArea;
@@ -400,8 +400,17 @@ public sealed partial class CustomWindow
     {
         await ScreensAgentService.InitializeIfNeed(JSRuntime);
 
-        if (_allInitedWindows.Contains(Window))
+        if (_windowsCollection.ContainsKey(Window))
+        {
+            // update instance and return
+            _windowsCollection[Window] = this;
             return;
+        }
+        else
+        {
+            // update instance and continue init
+            _windowsCollection[Window] = this;
+        }
 
         if (!Window.Chromeless)
             throw new ApplicationException("PhotinoWindow.Chromeless property should be set to true before the native window is instantiated.");
@@ -415,24 +424,23 @@ public sealed partial class CustomWindow
         // can't init MaxSize because PhotinoWindow don't store it's value
         //MaxSize = Window.MaxSize;
 
-        Window.WindowLocationChanged += (_, location) => WindowLocationChanged?.Invoke(location);
-        Window.WindowSizeChanged += (_, size) => WindowSizeChanged?.Invoke(size);
-        Window.WindowMaximized += (_, _) => WindowMaximized?.Invoke(Window.Maximized);
-        Window.WindowMinimized += (_, _) => WindowMinimized?.Invoke();
-        Window.WindowClosing += (_, _) => OnWindowClosing();
+        Window.WindowLocationChanged += (_, location) => _windowsCollection[Window].WindowLocationChanged?.Invoke(location);
+        Window.WindowSizeChanged += (_, size) => _windowsCollection[Window].WindowSizeChanged?.Invoke(size);
+        Window.WindowMaximized += (_, _) => _windowsCollection[Window].WindowMaximized?.Invoke(Window.Maximized);
+        Window.WindowMinimized += (_, _) => _windowsCollection[Window].WindowMinimized?.Invoke();
+        Window.WindowClosing += (_, _) => _windowsCollection[Window].OnWindowClosing();
         Window.WindowFocusIn += (_, _) =>
-        { 
-            _focused = true;
-            InvokeAsync(StateHasChanged);
-            WindowFocusIn?.Invoke();
+        {
+            _windowsCollection[Window]._focused = true;
+            _windowsCollection[Window].InvokeAsync(_windowsCollection[Window].StateHasChanged);
+            _windowsCollection[Window].WindowFocusIn?.Invoke();
         };
         Window.WindowFocusOut += (_, _) =>
         {
-            _focused = false;
-            InvokeAsync(StateHasChanged);
-            WindowFocusOut?.Invoke();
+            _windowsCollection[Window]._focused = false;
+            _windowsCollection[Window].InvokeAsync(_windowsCollection[Window].StateHasChanged);
+            _windowsCollection[Window].WindowFocusOut?.Invoke();
         };
-        _allInitedWindows.Add(Window);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -453,7 +461,7 @@ public sealed partial class CustomWindow
 
         var cancelClosing = cancelByCallback || cancelByEvent;
         if (!cancelClosing)
-            _allInitedWindows.Remove(Window);
+            _windowsCollection.Remove(Window);
         return cancelClosing;
     }
 
