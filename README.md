@@ -1,4 +1,7 @@
 # ![ ](customwindow.png) Photino.Blazor.CustomWindow
+
+[![NuGet Version](https://img.shields.io/nuget/v/Photino.Blazor.CustomWindow?logo=nuget)](https://www.nuget.org/packages/Photino.Blazor.CustomWindow) [![NuGet Downloads](https://img.shields.io/nuget/dt/Photino.Blazor.CustomWindow?logo=nuget)](https://www.nuget.org/packages/Photino.Blazor.CustomWindow)
+
 ![ ](preview.png)
 
 ## About
