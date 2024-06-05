@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using Photino.Blazor.CustomWindow.Services;
-using PhotinoNET;
+using Photino.NET;
 using System.Drawing;
 namespace Photino.Blazor.CustomWindow.Components;
 
