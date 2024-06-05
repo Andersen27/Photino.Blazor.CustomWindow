@@ -13,8 +13,8 @@
     <div @ref="headerDragArea"
          style="height: var(--pb-custom-window-header-height); width: 100vw;
                 background-color: var(--pb-custom-window-main-color)"
-         @onpointerdown="OnHeaderPointerDownAsync" @onpointerup="OnHeaderPointerUp"
-         @onpointermove="OnHeaderPointerMoveAsync" @ondblclick="OnHeaderDoubleClick"
+         @onpointerdown="OnHeaderPointerDown" @onpointerup="OnHeaderPointerUp"
+         @onpointermove="OnHeaderPointerMove" @ondblclick="OnHeaderDoubleClick"
          @onpointerdown:preventDefault>
     </div>
 
@@ -139,49 +139,49 @@
         <div @ref="resizeThumbLeft"
              style="width: @(ResizeAreaWidth)px; height: 100%; cursor: ew-resize"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.Left, e))"
-             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
+             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMove">
         </div>
 
         <div @ref="resizeThumbRight"
              style="width: @(ResizeAreaWidth)px; height: 100%; right: 0; cursor: ew-resize"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.Right, e))"
-             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
+             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMove">
         </div>
 
         <div @ref="resizeThumbTop"
              style="height: @(ResizeAreaWidth)px; width: 100%; cursor: ns-resize"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.Top, e))"
-             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
+             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMove">
         </div>
 
         <div @ref="resizeThumbBottom"
              style="height: @(ResizeAreaWidth)px; width: 100%; bottom: 0; cursor: ns-resize"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.Bottom, e))"
-             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
+             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMove">
         </div>
 
         <div @ref="resizeThumbTopLeft"
              style="width: @(ResizeAreaWidth)px; aspect-ratio: 1; cursor: nwse-resize"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.TopLeft, e))"
-             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
+             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMove">
         </div>
 
         <div @ref="resizeThumbTopRight"
              style="width: @(ResizeAreaWidth)px; aspect-ratio: 1; right: 0; cursor: nesw-resize"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.TopRight, e))"
-             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
+             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMove">
         </div>
 
         <div @ref="resizeThumbBottomLeft"
              style="width: @(ResizeAreaWidth)px; aspect-ratio: 1; bottom: 0; cursor: nesw-resize"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.BottomLeft, e))"
-             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
+             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMove">
         </div>
 
         <div @ref="resizeThumbBottomRight"
              style="width: @(ResizeAreaWidth)px; aspect-ratio: 1; bottom: 0; right: 0; cursor: nwse-resize"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.BottomRight, e))"
-             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
+             @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMove">
         </div>
     } 
 </div>

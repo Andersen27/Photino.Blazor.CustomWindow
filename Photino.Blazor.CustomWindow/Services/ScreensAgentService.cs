@@ -1,179 +1,143 @@
 ﻿using Microsoft.AspNetCore.Components.Web;
-using Microsoft.JSInterop;
 using System.Drawing;
-using System.Text.Json;
+using Monitor = Photino.NET.Monitor;
 
 namespace Photino.Blazor.CustomWindow.Services;
 
-public class ScreensAgentService
+public class ScreensAgentService(PhotinoBlazorApp photinoBlazorApp)
 {
-    private sealed class ScreenInfo
+    private PhotinoBlazorApp PhotinoBlazorApp { get; set; } = photinoBlazorApp;
+
+    private Dictionary<Monitor, Rectangle> _monitorsWebScreens;
+
+    public bool Inited => _monitorsWebScreens != null;
+
+    private static Rectangle ScaleRect(Rectangle rect, double scale)
     {
-        public Rectangle OriginalArea { get; set; }
-        public double ScaleFactor { get; set; }
-        public int ActualLeft { get; set; }
-        public int ActualTop { get; set; }
-        public bool PositionActualized { get; set; } = false;
+        return new Rectangle(rect.X, rect.Y, (int)(rect.Width * scale), (int)(rect.Height * scale));
     }
 
-    private IJSObjectReference _jsModule;
-    private Task _updateScreensInfoTask;
-    private List<ScreenInfo> _screensInfo;
-
-    public bool Inited => _screensInfo != null;
-
-    public async Task<Point> GetOSPointerPositionAsync(PointerEventArgs e)
+    public Point GetOSPointerPosition(MouseEventArgs e)
     {
-        await _updateScreensInfoTask;
         var pointerScreenPos = new Point((int)e.ScreenX, (int)e.ScreenY);
-        var screen = _screensInfo.First(s => s.OriginalArea.Contains(pointerScreenPos));
-        pointerScreenPos.Offset(-screen.OriginalArea.Left, -screen.OriginalArea.Top);
-        return new Point(screen.ActualLeft + (int)(pointerScreenPos.X * screen.ScaleFactor),
-                         screen.ActualTop + (int)(pointerScreenPos.Y * screen.ScaleFactor));
+        var monitorScreenPair = _monitorsWebScreens.First(s => s.Value.Contains(pointerScreenPos));
+        var monitor = monitorScreenPair.Key;
+        var webScreen = monitorScreenPair.Value;
+        return new()
+        {
+            X = (int)(monitor.MonitorArea.X + monitor.Scale * (pointerScreenPos.X - webScreen.X)),
+            Y = (int)(monitor.MonitorArea.Y + monitor.Scale * (pointerScreenPos.Y - webScreen.Y)),
+        };
     }
 
-    public async Task<double> GetPointerPositionScaleFactorAsync(PointerEventArgs e)
+    public double GetPointerScreenScale(MouseEventArgs e)
     {
-        await _updateScreensInfoTask;
         var pointerScreenPos = new Point((int)e.ScreenX, (int)e.ScreenY);
-        var screen = _screensInfo.First(s => s.OriginalArea.Contains(pointerScreenPos));
-        return screen.ScaleFactor;
+        var monitor = _monitorsWebScreens.First(s => s.Value.Contains(pointerScreenPos)).Key;
+        return monitor.Scale;
     }
 
-    public async Task InitializeIfNeed(IJSRuntime jsRuntime)
+    public void InitializeIfNeed()
     {
         if (!Inited)
-        {
-            _jsModule = await jsRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/Photino.Blazor.CustomWindow/js/pb-screens-agent.js");
-            _updateScreensInfoTask = UpdateScreensInfo();
-        }
+            UpdateScreensInfo();
     }
 
-    public async Task UpdateScreensInfo()
+    public void UpdateScreensInfo()
     {
-        // when the application is launched for the first time, "window-management" permission must be granted.
-        // transient activation is required to request permission, so this call can wait for the first transient activation.
-        var screensInfo = await _jsModule.InvokeAsync<JsonElement[]>("getScreensInfo");
+        // init monitors and primary monitor
+        var monitors = PhotinoBlazorApp.MainWindow.Monitors.ToArray();
+        var primaryMonitor = monitors.Single(m => m.MonitorArea.Location.IsEmpty);
 
-        _screensInfo = [];
-        foreach (var screen in screensInfo)
+        // simple calculation if there is single monitor or no specific scale factors
+        if (monitors.Length == 1 || monitors.All(m => m.Scale == 1))
         {
-            _screensInfo.Add(new ScreenInfo()
-            {
-                OriginalArea = new Rectangle(
-                    (int)screen[0].GetDouble(), (int)screen[1].GetDouble(),
-                    (int)screen[2].GetDouble(), (int)screen[3].GetDouble()
-                ),
-                ScaleFactor = screen[4].GetDouble()
-            });
-        }
-
-        var primaryScreen = _screensInfo.FirstOrDefault(s => s.OriginalArea.Location.IsEmpty);
-        if (primaryScreen is null)
-            throw new Exception("Unable to get correct screens info");
-
-        primaryScreen.PositionActualized = true;
-        if (_screensInfo.Count == 1)
-        {
+            _monitorsWebScreens = new();
+            foreach (var monitor in monitors)
+                _monitorsWebScreens[monitor] = ScaleRect(monitor.MonitorArea, 1 / monitor.Scale);
             return;
         }
-        else if (_screensInfo.All(s => s.ScaleFactor == 1))
+
+        // determine monitors positioning direction
+        var isHorisontalDirection =
+            monitors.Any(m1 => monitors.Except([m1]).Any(m2 => m2.MonitorArea.Left >= m1.MonitorArea.Width)) ||
+            monitors.Any(m1 => m1.MonitorArea.Left <= -m1.MonitorArea.Width);
+        var isVerticalDirection =
+            monitors.Any(m1 => monitors.Except([m1]).Any(m2 => m2.MonitorArea.Top >= m1.MonitorArea.Height)) ||
+            monitors.Any(m1 => m1.MonitorArea.Top <= -m1.MonitorArea.Height);
+
+        if (!(isHorisontalDirection ^ isVerticalDirection))
         {
-            foreach (var s in _screensInfo)
-            {
-                s.ActualLeft = s.OriginalArea.Left;
-                s.ActualTop = s.OriginalArea.Top;
-                s.PositionActualized = true;
-            }
+            throw new Exception("Only one-direction monitors positioning supported for different scale factors");
         }
         else
         {
-            var isHorisontalDirection =
-                _screensInfo.Any(s1 => _screensInfo.Any(s2 => s2 != s1 && s2.OriginalArea.Left >= s1.OriginalArea.Width)) ||
-                _screensInfo.Any(s1 => s1.OriginalArea.Left <= -s1.OriginalArea.Width);
-            var isVerticalDirection =
-                _screensInfo.Any(s1 => _screensInfo.Any(s2 => s2 != s1 && s2.OriginalArea.Top >= s1.OriginalArea.Height)) ||
-                _screensInfo.Any(s1 => s1.OriginalArea.Top <= -s1.OriginalArea.Height);
-            if (!(isHorisontalDirection ^ isVerticalDirection))
-                throw new Exception("Only one-direction monitors positioning supported for different scale factors");
-            else if (isHorisontalDirection)
+            // add primary monitor to dictionary
+            var primaryWebScreen = ScaleRect(primaryMonitor.MonitorArea, 1 / primaryMonitor.Scale);
+            _monitorsWebScreens = new() { {primaryMonitor, primaryWebScreen} };
+            Rectangle lastWebScreen;
+
+            // horizontal direction calculation
+            if (isHorisontalDirection)
             {
-                var commonTopOffset = (int)(primaryScreen.OriginalArea.Height * (primaryScreen.ScaleFactor - 1));
-                var linkedScreensInfo = new LinkedList<ScreenInfo>(_screensInfo.OrderBy(s => s.OriginalArea.Left));
-                var currentScreenNode = linkedScreensInfo.First;
-                while (currentScreenNode != null)
+                var monitorsOrderedByX = monitors.OrderBy(m => m.MonitorArea.X).ToArray();
+                var primaryMonitorIndex = Array.IndexOf(monitorsOrderedByX, primaryMonitor);
+
+                lastWebScreen = primaryWebScreen;
+                for (int i = primaryMonitorIndex + 1; i < monitorsOrderedByX.Length; i++)
                 {
-                    UpdateActualHorizontalPosition(currentScreenNode, commonTopOffset);
-                    currentScreenNode = currentScreenNode.Next;
+                    var monitor = monitorsOrderedByX[i];
+                    var webScreen = ScaleRect(monitor.MonitorArea, 1 / monitor.Scale);
+                    webScreen.X = lastWebScreen.Right;
+                    webScreen.Y = (int)(monitor.MonitorArea.Y / primaryMonitor.Scale) +
+                        (monitor.MonitorArea.Y > 0 ? 0 : primaryWebScreen.Bottom - webScreen.Height);
+                    _monitorsWebScreens[monitor] = webScreen;
+                    lastWebScreen = webScreen;
+                }
+
+                lastWebScreen = primaryWebScreen;
+                for (int i = primaryMonitorIndex - 1; i >= 0; i--)
+                {
+                    var monitor = monitorsOrderedByX[i];
+                    var webScreen = ScaleRect(monitor.MonitorArea, 1 / monitor.Scale);
+                    webScreen.X = lastWebScreen.Left - webScreen.Width;
+                    webScreen.Y = (int)(monitor.MonitorArea.Y / primaryMonitor.Scale) +
+                        (monitor.MonitorArea.Y > 0 ? 0 : primaryWebScreen.Bottom - webScreen.Height);
+                    _monitorsWebScreens[monitor] = webScreen;
+                    lastWebScreen = webScreen;
                 }
             }
-            else if (isVerticalDirection)
+
+            // vertical direction calculation
+            if (isVerticalDirection)
             {
-                var commonLeftOffset = (int)(primaryScreen.OriginalArea.Width * (primaryScreen.ScaleFactor - 1));
-                var linkedScreensInfo = new LinkedList<ScreenInfo>(_screensInfo.OrderBy(s => s.OriginalArea.Top));
-                var currentScreenNode = linkedScreensInfo.First;
-                while (currentScreenNode != null)
+                var monitorsOrderedByY = monitors.OrderBy(m => m.MonitorArea.Y).ToArray();
+                var primaryMonitorIndex = Array.IndexOf(monitorsOrderedByY, primaryMonitor);
+
+                lastWebScreen = primaryWebScreen;
+                for (int i = primaryMonitorIndex + 1; i < monitorsOrderedByY.Length; i++)
                 {
-                    UpdateActualVerticalPosition(currentScreenNode, commonLeftOffset);
-                    currentScreenNode = currentScreenNode.Next;
+                    var monitor = monitorsOrderedByY[i];
+                    var webScreen = ScaleRect(monitor.MonitorArea, 1 / monitor.Scale);
+                    webScreen.Y = lastWebScreen.Bottom;
+                    webScreen.X = (int)(monitor.MonitorArea.X / primaryMonitor.Scale) +
+                        (monitor.MonitorArea.X > 0 ? 0 : primaryWebScreen.Right - webScreen.Width);
+                    _monitorsWebScreens[monitor] = webScreen;
+                    lastWebScreen = webScreen;
+                }
+
+                lastWebScreen = primaryWebScreen;
+                for (int i = primaryMonitorIndex - 1; i >= 0; i--)
+                {
+                    var monitor = monitorsOrderedByY[i];
+                    var webScreen = ScaleRect(monitor.MonitorArea, 1 / monitor.Scale);
+                    webScreen.Y = lastWebScreen.Top - webScreen.Height;
+                    webScreen.X = (int)(monitor.MonitorArea.X / primaryMonitor.Scale) +
+                        (monitor.MonitorArea.X > 0 ? 0 : primaryWebScreen.Right - webScreen.Width);
+                    _monitorsWebScreens[monitor] = webScreen;
+                    lastWebScreen = webScreen;
                 }
             }
         }
-    }
-
-    private static void UpdateActualHorizontalPosition(LinkedListNode<ScreenInfo> screenNode, int commonTopOffset)
-    {
-        var screen = screenNode.Value;
-        if (screen.PositionActualized)
-            return;
-
-        if (screen.OriginalArea.Left == 0)
-        {
-            screen.ActualLeft = 0;
-        }
-        else if (screen.OriginalArea.Left > 0)
-        {
-            var screenOnLeft = screenNode.Previous.Value;
-            if (!screenOnLeft.PositionActualized)
-                UpdateActualHorizontalPosition(screenNode.Previous, commonTopOffset);
-            screen.ActualLeft = screenOnLeft.ActualLeft + (int)(screenOnLeft.OriginalArea.Width * screenOnLeft.ScaleFactor);
-        }
-        else
-        {
-            var screenOnRight = screenNode.Next.Value;
-            if (!screenOnRight.PositionActualized)
-                UpdateActualHorizontalPosition(screenNode.Next, commonTopOffset);
-            screen.ActualLeft = screenOnRight.ActualLeft - (int)(screen.OriginalArea.Width * screen.ScaleFactor);
-        }
-        screen.ActualTop = screen.OriginalArea.Top + commonTopOffset;
-        screen.PositionActualized = true;
-    }
-
-    private static void UpdateActualVerticalPosition(LinkedListNode<ScreenInfo> screenNode, int commonLeftOffset)
-    {
-        var screen = screenNode.Value;
-        if (screen.PositionActualized)
-            return;
-
-        if (screen.OriginalArea.Top == 0)
-        {
-            screen.ActualTop = 0;
-        }
-        else if (screen.OriginalArea.Top > 0)
-        {
-            var screenOnTop = screenNode.Previous.Value;
-            if (!screenOnTop.PositionActualized)
-                UpdateActualVerticalPosition(screenNode.Previous, commonLeftOffset);
-            screen.ActualTop = screenOnTop.ActualTop + (int)(screenOnTop.OriginalArea.Height * screenOnTop.ScaleFactor);
-        }
-        else
-        {
-            var screenOnBottom = screenNode.Next.Value;
-            if (!screenOnBottom.PositionActualized)
-                UpdateActualVerticalPosition(screenNode.Next, commonLeftOffset);
-            screen.ActualTop = screenOnBottom.ActualTop - (int)(screen.OriginalArea.Height * screen.ScaleFactor);
-        }
-        screen.ActualLeft = screen.OriginalArea.Left + commonLeftOffset;
-        screen.PositionActualized = true;
     }
 }

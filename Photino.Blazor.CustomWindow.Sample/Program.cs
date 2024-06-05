@@ -1,5 +1,4 @@
 ﻿using System;
-using Microsoft.Extensions.DependencyInjection;
 using Photino.Blazor.CustomWindow.Extensions;
 
 namespace Photino.Blazor.CustomWindow.Sample
@@ -11,9 +10,8 @@ namespace Photino.Blazor.CustomWindow.Sample
         {
             var appBuilder = PhotinoBlazorAppBuilder.CreateDefault(args);
 
-            appBuilder.Services
-                .AddCustomWindow()
-                .AddLogging();
+            // add custom window services
+            appBuilder.Services.AddCustomWindow();
 
             // register root component and selector
             appBuilder.RootComponents.Add<App>("app");
