@@ -4,13 +4,13 @@
 <div class="pb-custom-window @(Focused ? "" : "pb-custom-window-unfocused")" @attributes="@AdditionalAttributes"
      style="width: 100vw; height: 100vh; --pb-custom-window-header-height: @(HeaderHeight)px; @Style">
 
-    <div style="top: var(--pb-custom-window-header-height); left: 1px;
+    <div class="pb-custom-window-content" style="top: var(--pb-custom-window-header-height); left: 1px;
                 height: calc(100vh - var(--pb-custom-window-header-height) - 1px); width: calc(100vw - 2px);
                 overflow: hidden; background-color: var(--pb-custom-window-background-color)">
         @WindowContent
     </div>
 
-    <div @ref="headerDragArea"
+    <div class="pb-custom-window-header-drag-area" @ref="headerDragArea"
          style="height: var(--pb-custom-window-header-height); width: 100vw;
                 background-color: var(--pb-custom-window-main-color)"
          @onpointerdown="OnHeaderPointerDownAsync" @onpointerup="OnHeaderPointerUp"
@@ -74,7 +74,7 @@
             {
                 <div class="pb-custom-window-control-buttons">
                     <button @onclick="Minimize"
-                            class="pb-custom-window-control-button">
+                            class="pb-custom-window-control-button pb-custom-window-minimize-button">
                         @if (MinimizeButtonContent is null)
                         {
                             <svg viewBox="0 0 22 22"><path d="m6,11h10v1h-10z" /></svg>
@@ -88,7 +88,7 @@
                     @if (Maximized)
                     {
                         <button @onclick="Restore"
-                                class="pb-custom-window-control-button">
+                                class="pb-custom-window-control-button pb-custom-window-restore-button">
                             @if (RestoreButtonContent is null)
                             {
                                 <svg viewBox="0 0 22 22"><path d="m6,9h7v7h-7zm1,1v5h5v-5zm1,-2v-2h8v8h-2v-1h1v-6h-6v1z" /></svg>
@@ -102,7 +102,7 @@
                     else
                     {
                         <button @onclick="Maximize"
-                                class="pb-custom-window-control-button">
+                                class="pb-custom-window-control-button pb-custom-window-maximize-button">
                             @if (MaximizeButtonContent is null)
                             {
                                 <svg viewBox="0 0 22 22"><path d="m6,6h10v10h-10zm1,1v8h8v-8z" /></svg>
@@ -138,48 +138,56 @@
     {
         <div @ref="resizeThumbLeft"
              style="width: @(ResizeAreaWidth)px; height: 100%; cursor: ew-resize"
+             class="pb-custom-window-resize-thumb pb-custom-window-resize-thumb-left"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.Left, e))"
              @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
         </div>
 
         <div @ref="resizeThumbRight"
              style="width: @(ResizeAreaWidth)px; height: 100%; right: 0; cursor: ew-resize"
+             class="pb-custom-window-resize-thumb pb-custom-window-resize-thumb-right"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.Right, e))"
              @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
         </div>
 
         <div @ref="resizeThumbTop"
              style="height: @(ResizeAreaWidth)px; width: 100%; cursor: ns-resize"
+             class="pb-custom-window-resize-thumb pb-custom-window-resize-thumb-top"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.Top, e))"
              @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
         </div>
 
         <div @ref="resizeThumbBottom"
              style="height: @(ResizeAreaWidth)px; width: 100%; bottom: 0; cursor: ns-resize"
+             class="pb-custom-window-resize-thumb pb-custom-window-resize-thumb-bottom"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.Bottom, e))"
              @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
         </div>
 
         <div @ref="resizeThumbTopLeft"
              style="width: @(ResizeAreaWidth)px; aspect-ratio: 1; cursor: nwse-resize"
+             class="pb-custom-window-resize-thumb pb-custom-window-resize-thumb-top-left"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.TopLeft, e))"
              @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
         </div>
 
         <div @ref="resizeThumbTopRight"
              style="width: @(ResizeAreaWidth)px; aspect-ratio: 1; right: 0; cursor: nesw-resize"
+             class="pb-custom-window-resize-thumb pb-custom-window-resize-thumb-top-right"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.TopRight, e))"
              @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
         </div>
 
         <div @ref="resizeThumbBottomLeft"
              style="width: @(ResizeAreaWidth)px; aspect-ratio: 1; bottom: 0; cursor: nesw-resize"
+             class="pb-custom-window-resize-thumb pb-custom-window-resize-thumb-bottom-left"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.BottomLeft, e))"
              @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
         </div>
 
         <div @ref="resizeThumbBottomRight"
              style="width: @(ResizeAreaWidth)px; aspect-ratio: 1; bottom: 0; right: 0; cursor: nwse-resize"
+             class="pb-custom-window-resize-thumb pb-custom-window-resize-thumb-bottom-right"
              @onpointerdown="@(e => OnResizeThumbPointerDown(ResizeThumb.BottomRight, e))"
              @onpointerup="OnResizeThumbPointerUp" @onpointermove="OnResizeThumbPointerMoveAsync">
         </div>
