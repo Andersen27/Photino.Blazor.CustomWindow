@@ -1,6 +1,6 @@
-function invokeElementMethod(element, methodName, ...args) {
+function invokeElementMethod(element, methodName, args) {
     if (element)
-        element[methodName](args);
+        element[methodName](...args);
 }
 function getElementPropertyValue(element, propertyName) {
     return element ? element[propertyName] : null;
