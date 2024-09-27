@@ -16,6 +16,7 @@
         <PackageTags>photino;blazor;custom;window;customwindow;customizable;chromeless;header</PackageTags>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+        <PackageProjectUrl>https://github.com/Andersen27/Photino.Blazor.CustomWindow</PackageProjectUrl>
         <RepositoryUrl>https://github.com/Andersen27/Photino.Blazor.CustomWindow</RepositoryUrl>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageIcon>customwindow.png</PackageIcon>
@@ -27,7 +28,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Photino.Blazor" Version="3.0.11" />
+      <PackageReference Include="Photino.Blazor" Version="3.1.10" />
     </ItemGroup>
 
 </Project>

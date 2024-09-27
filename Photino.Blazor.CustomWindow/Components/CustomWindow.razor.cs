@@ -4,6 +4,7 @@ using Microsoft.JSInterop;
 using Photino.Blazor.CustomWindow.Services;
 using Photino.NET;
 using System.Drawing;
+
 namespace Photino.Blazor.CustomWindow.Components;
 
 /// <summary>
@@ -239,14 +240,12 @@ public sealed partial class CustomWindow
                             }
                         }
                     }
-
-                    Size = _maximizeWorkArea.Value.Size;
-                    Location = _maximizeWorkArea.Value.Location;
+                    var maximizeWorkArea = _maximizeWorkArea.Value;
+                    DoActionAfterSetSize(maximizeWorkArea.Size, () => Location = maximizeWorkArea.Location);
                 }
                 else
                 {
-                    Size = _restoreSize;
-                    Location = _restoreLocation;
+                    DoActionAfterSetSize(_restoreSize, () => Location = _restoreLocation);
                 }
 
                 ResizeAvailable = !value;
@@ -484,46 +483,52 @@ public sealed partial class CustomWindow
         {
             _expanded = true;
             _restoreSize = Size;
-            Size = new Size(workArea.Size.Width / 2, workArea.Size.Height / 2);
-            Location = workArea.Location;
+            var size = new Size(workArea.Size.Width / 2, workArea.Size.Height / 2);
+            var location = workArea.Location;
+            DoActionAfterSetSize(size, () => Location = location);
         }
         else if (pointerScreenPos.X > workArea.Location.X + workArea.Width - 1 - BordersExpandThreshold  &&
                  pointerScreenPos.Y < workArea.Y + BordersExpandThreshold)
         {
             _expanded = true;
             _restoreSize = Size;
-            Size = new Size(workArea.Size.Width / 2, workArea.Size.Height / 2);
-            Location = new Point(workArea.Location.X + workArea.Size.Width / 2, workArea.Location.Y);
+            var size = new Size(workArea.Size.Width / 2, workArea.Size.Height / 2);
+            var location = new Point(workArea.Location.X + workArea.Size.Width / 2, workArea.Location.Y);
+            DoActionAfterSetSize(size, () => Location = location);
         }
         else if (pointerScreenPos.X < workArea.X + BordersExpandThreshold &&
                  pointerScreenPos.Y > workArea.Location.Y + workArea.Height - 1 - BordersExpandThreshold)
         {
             _expanded = true;
             _restoreSize = Size;
-            Size = new Size(workArea.Size.Width / 2, workArea.Size.Height / 2);
-            Location = new Point(workArea.Location.X, workArea.Location.Y + workArea.Size.Height / 2);
+            var size = new Size(workArea.Size.Width / 2, workArea.Size.Height / 2);
+            var location = new Point(workArea.Location.X, workArea.Location.Y + workArea.Size.Height / 2);
+            DoActionAfterSetSize(size, () => Location = location);
         }
         else if (pointerScreenPos.X > workArea.Location.X + workArea.Width - 1 - BordersExpandThreshold &&
                  pointerScreenPos.Y > workArea.Location.Y + workArea.Height - 1 - BordersExpandThreshold)
         {
             _expanded = true;
             _restoreSize = Size;
-            Size = new Size(workArea.Size.Width / 2, workArea.Size.Height / 2);
-            Location = new Point(workArea.Location.X + workArea.Size.Width / 2, workArea.Location.Y + workArea.Size.Height / 2);
+            var size = new Size(workArea.Size.Width / 2, workArea.Size.Height / 2);
+            var location = new Point(workArea.Location.X + workArea.Size.Width / 2, workArea.Location.Y + workArea.Size.Height / 2);
+            DoActionAfterSetSize(size, () => Location = location);
         }
         else if (pointerScreenPos.X < workArea.X + BordersExpandThreshold)
         {
             _expanded = true;
             _restoreSize = Size;
-            Size = new Size(workArea.Size.Width / 2, workArea.Size.Height);
-            Location = workArea.Location;
+            var size = new Size(workArea.Size.Width / 2, workArea.Size.Height);
+            var location = workArea.Location;
+            DoActionAfterSetSize(size, () => Location = location);
         }
         else if (pointerScreenPos.X > workArea.Location.X + workArea.Width - 1 - BordersExpandThreshold)
         {
             _expanded = true;
             _restoreSize = Size;
-            Size = new Size(workArea.Size.Width / 2, workArea.Size.Height);
-            Location = new Point(workArea.Location.X + workArea.Size.Width / 2, workArea.Location.Y);
+            var size = new Size(workArea.Size.Width / 2, workArea.Size.Height);
+            var location = new Point(workArea.Location.X + workArea.Size.Width / 2, workArea.Location.Y);
+            DoActionAfterSetSize(size, () => Location = location);
         }
         else if (pointerScreenPos.Y < workArea.Y + BordersExpandThreshold)
         {
@@ -534,8 +539,9 @@ public sealed partial class CustomWindow
         {
             _expanded = true;
             _restoreSize = Size;
-            Size = new Size(workArea.Size.Width, workArea.Size.Height / 2);
-            Location = new Point(workArea.Location.X, workArea.Location.Y + workArea.Size.Height / 2);
+            var size = new Size(workArea.Size.Width, workArea.Size.Height / 2);
+            var location = new Point(workArea.Location.X, workArea.Location.Y + workArea.Size.Height / 2);
+            DoActionAfterSetSize(size, () => Location = location);
         }
     }
 
@@ -557,19 +563,15 @@ public sealed partial class CustomWindow
         }
     }
 
-    private async Task OnHeaderPointerDown(PointerEventArgs e)
+    private void DoActionAfterSetSize(Size newSize, Action action)
     {
-        if (e.Button == 0)
+        void onSizeUpadted(Size _)
         {
-            _movingProcess = true;
-
-            var scale = ScreensAgentService.GetPointerScreenScale(e);
-            _headerPointerOffset = new Point((int)(e.OffsetX * scale),
-                                             (int)(e.OffsetY * scale));
-
-            await JSRuntime.InvokeElementMethodAsync(headerDragArea, "setPointerCapture", e.PointerId);
-            WindowMoveBegin?.Invoke();
+            WindowSizeChanged -= onSizeUpadted;
+            action();
         }
+        WindowSizeChanged += onSizeUpadted;
+        Size = newSize;
     }
 
     private void OnHeaderPointerUp(PointerEventArgs e)
@@ -582,14 +584,16 @@ public sealed partial class CustomWindow
             if (EnableExpand)
                 UpdateMoveExpand(e);
 
-            // hack to force update layout scale when working with different scaled screens
-            var targetSize = Size;
-            Window.Size = new Size(targetSize.Width, targetSize.Height - 1);
-            Window.Size = targetSize;
+            if (!_expanded)
+            {
+                // hack to force update layout scale when working with different scaled screens
+                var targetSize = Size;
+                DoActionAfterSetSize(new Size(targetSize.Width, targetSize.Height + 1), () => Window.Size = targetSize);
+            }
         }
     }
 
-    private void OnHeaderPointerMove(PointerEventArgs e)
+    private async Task OnHeaderPointerMoveAsync(PointerEventArgs e)
     {
         if (_movingProcess)
         {
@@ -602,7 +606,9 @@ public sealed partial class CustomWindow
                 _headerPointerOffset = new Point(newPointerOffsetX, _headerPointerOffset.Y);
                 _expanded = false;
 
-                Size = _restoreSize;
+                if (!Maximized)
+                    Size = _restoreSize;
+
                 if (Maximized)
                     Maximized = false; 
             }
@@ -614,6 +620,21 @@ public sealed partial class CustomWindow
 
             Location = new Point(limitedPointerPos.X - _headerPointerOffset.X, limitedPointerPos.Y - _headerPointerOffset.Y);
             WindowMoving?.Invoke(e);
+        }
+        else
+        {
+            // begin header drag by left mouse button
+            if ((e.Buttons & 1) != 0)
+            {
+                _movingProcess = true;
+
+                var scale = ScreensAgentService.GetPointerScreenScale(e);
+                _headerPointerOffset = new Point((int)(e.OffsetX * scale),
+                                                 (int)(e.OffsetY * scale));
+
+                await JSRuntime.InvokeElementMethodAsync(headerDragArea, "setPointerCapture", e.PointerId);
+                WindowMoveBegin?.Invoke();
+            }
         }
     }
 
